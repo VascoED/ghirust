@@ -1,0 +1,1064 @@
+# GHIRUST
+## Plataforma de Engenharia Inversa, Análise Binária e Descompilação Multilingue
+
+**Arquitetura:** Rust + C++ + CPU/GPU
+**Interface:** Aplicação nativa com Command Center
+**Idiomas:** Português de Portugal (`pt-PT`), Português do Brasil (`pt-BR`), Inglês dos EUA (`en-US`) e Russo (`ru-RU`)
+**Objetivo:** Reimplementar e expandir o GHIRA original, preservando as suas funcionalidades oficiais e acrescentando as capacidades definidas neste documento.
+
+---
+
+# 1. Visão e objetivo
+
+O GHIRUST é uma plataforma de engenharia inversa e descompilação destinada a analisar executáveis, bibliotecas e outros formatos binários, identificar a sua estrutura interna e reconstruir representações legíveis do código e do comportamento.
+
+O projeto deve partir de uma auditoria real do código original existente em:
+
+`ghira_original_source_code/`
+
+O objetivo não é criar apenas uma ferramenta semelhante ao GHIRA. É construir uma implementação que preserve as funcionalidades oficiais do original, melhore a experiência de utilização e acrescente as funcionalidades avançadas descritas neste README.
+
+**Regra fundamental:** nenhuma funcionalidade oficial do GHIRA pode ser removida ou considerada dispensável sem uma análise documentada, uma justificação técnica e uma alternativa funcional validada.
+
+O projeto deve privilegiar:
+
+1. Correção da análise e da descompilação.
+2. Paridade funcional com o GHIRA original.
+3. Interface clara e acessível.
+4. Fiabilidade em ficheiros pequenos e muito grandes.
+5. Velocidade de pesquisa e análise.
+6. Utilização eficiente de CPU, RAM, GPU e VRAM.
+7. Resultados reproduzíveis e auditáveis.
+
+---
+
+# 2. Auditoria obrigatória do GHIRA original
+
+A pasta `ghira_original_source_code/` é a referência primária para determinar o comportamento oficial do GHIRA.
+
+Antes de substituir ou reimplementar qualquer funcionalidade, o agente de desenvolvimento deve:
+
+- Percorrer recursivamente o código-fonte original.
+- Identificar todos os módulos, componentes, bibliotecas, interfaces e dependências.
+- Identificar todas as funcionalidades visíveis na interface original.
+- Identificar formatos de entrada e saída.
+- Identificar operações de análise, descompilação, exportação, pesquisa e navegação.
+- Identificar opções, configurações, atalhos, menus e fluxos de trabalho.
+- Identificar mecanismos de cache, indexação, processamento paralelo e recuperação de erros.
+- Verificar como o original gere ficheiros grandes e resultados extensos.
+- Identificar APIs, bibliotecas e componentes que possam ser reutilizados legalmente e tecnicamente.
+- Documentar as diferenças entre o comportamento original e o GHIRUST.
+
+Criar `docs/ghira_compatibility_matrix.md` com uma tabela deste género:
+
+| Funcionalidade original | Localização no código GHIRA | Estado GHIRUST | Implementação equivalente | Teste |
+|---|---|---|---|---|
+| Deteção de ficheiros | A identificar | Pendente | Módulo de formatos | Pendente |
+| Descompilação | A identificar | Pendente | Backend correspondente | Pendente |
+| Pesquisa | A identificar | Parcial | Motor de pesquisa | Pendente |
+| Exportação | A identificar | Parcial | Exportação incremental | Pendente |
+| Interface | A identificar | Pendente | Command Center | Pendente |
+
+Usar estados rigorosos:
+
+- `NOT_AUDITED`
+- `NOT_IMPLEMENTED`
+- `IN_PROGRESS`
+- `PARTIALLY_IMPLEMENTED`
+- `IMPLEMENTED`
+- `TESTED`
+- `VERIFIED_EQUIVALENT`
+- `BLOCKED`
+
+Uma funcionalidade só pode ser marcada como `VERIFIED_EQUIVALENT` depois de ser comparada com o comportamento real do GHIRA.
+
+---
+
+# 3. Arquitetura tecnológica
+
+## 3.1 Rust — núcleo principal
+
+Rust deve ser responsável por:
+
+- Motor central de análise.
+- Gestão de memória e recursos.
+- Deteção e leitura de formatos.
+- Indexação e pesquisa.
+- Intermediate Representation.
+- Processamento paralelo.
+- Orquestração de tarefas.
+- Cache persistente.
+- Exportação incremental.
+- Gestão de sessões.
+- Comunicação com a interface.
+- Monitorização e diagnósticos.
+- Internacionalização.
+
+Preferir Rust seguro. Isolar código `unsafe` em módulos pequenos e documentados.
+
+## 3.2 C++
+
+C++ pode ser utilizado em componentes especializados quando exista uma justificação técnica e uma vantagem mensurável:
+
+- Algoritmos de baixo nível.
+- Desassemblagem especializada.
+- SIMD.
+- Integração com bibliotecas nativas.
+- Componentes de análise de ABI.
+- Kernels ou bibliotecas de computação.
+
+Não criar componentes C++ apenas para aumentar a complexidade do projeto. A comunicação com Rust deve utilizar interfaces estáveis, preferencialmente C ABI.
+
+## 3.3 CPU e GPU
+
+Suportar:
+
+- CPU multithread.
+- SIMD quando apropriado.
+- CUDA para NVIDIA, quando disponível.
+- HIP para AMD, quando disponível.
+- Vulkan Compute como opção multiplataforma, quando tecnicamente adequado.
+
+A implementação GPU deve ser modular e opcional. A aplicação tem de funcionar integralmente em CPU quando não existir GPU compatível.
+
+A utilização da GPU só deve ocorrer quando o paralelismo e o volume de dados justificarem os custos de preparação, transferência e sincronização.
+
+---
+
+# 4. Motor central — GUDE
+
+Criar o `GHIRUST Unified Decompilation Engine (GUDE)`.
+
+Fluxo geral:
+
+1. Receção do ficheiro ou projeto.
+2. Validação e identificação do tipo de entrada.
+3. Deteção do formato, arquitetura e metadados.
+4. Carregamento seguro e eficiente.
+5. Indexação inicial.
+6. Deteção de funções e estruturas.
+7. Desassemblagem.
+8. Construção da IR.
+9. Análises de controlo e fluxo de dados.
+10. Reconstrução e descompilação.
+11. Exportação progressiva dos resultados.
+12. Persistência da sessão e dos resultados.
+
+O motor deve suportar:
+
+- Operações incrementais.
+- Cancelamento.
+- Pausa e retoma quando tecnicamente possível.
+- Recuperação após falhas.
+- Tarefas paralelas.
+- Priorização.
+- Backpressure.
+- Diagnósticos estruturados.
+- Sessões persistentes.
+- Reprocessamento seletivo.
+
+A interface não deve bloquear enquanto o motor trabalha.
+
+---
+
+# 5. Unified Intermediate Representation — GUIR
+
+Criar uma representação intermédia comum sem eliminar informação específica da linguagem original.
+
+Representar, sempre que recuperável:
+
+- Instruções.
+- Funções.
+- Blocos básicos.
+- Grafos de fluxo de controlo.
+- Variáveis.
+- Tipos.
+- Expressões.
+- Operações de memória.
+- Chamadas.
+- Dependências.
+- Exceções.
+- Referências cruzadas.
+- Estruturas de controlo.
+- Metadados da linguagem.
+- Informação de compilador e ABI.
+
+A GUIR deve suportar:
+
+- Validação.
+- Serialização.
+- Versionamento.
+- Atualizações incrementais.
+- Referências entre módulos.
+- Proveniência dos dados.
+- Níveis de confiança.
+- Preservação de metadados específicos.
+
+Não apresentar inferências como certezas. Distinguir metadados confirmados de resultados inferidos.
+
+---
+
+# 6. Formatos, arquiteturas e deteção automática
+
+Implementar deteção de:
+
+- PE, incluindo EXE e DLL.
+- ELF.
+- Mach-O.
+- JVM CLASS.
+- JAR.
+- WAR e EAR, quando aplicável.
+- Python bytecode.
+- WebAssembly.
+- Outros formatos identificados na auditoria do GHIRA.
+
+Identificar, quando possível:
+
+- Arquitetura.
+- Endianness.
+- Sistema operativo de destino.
+- ABI.
+- Compilador.
+- Versão do compilador.
+- Linguagem provável.
+- Runtime.
+- Secções.
+- Segmentos.
+- Tabelas de símbolos.
+- Imports e exports.
+- Relocalizações.
+- Recursos.
+- Metadados de depuração.
+
+Cada conclusão heurística deve incluir um nível de confiança e a evidência que a suporta.
+
+---
+
+# 7. Análise e reconstrução
+
+Criar módulos especializados para:
+
+- Deteção de funções.
+- Desassemblagem.
+- Reconstrução de CFG.
+- Análise de fluxo de dados.
+- Análise de referências cruzadas.
+- Recuperação de símbolos.
+- Inferência de tipos.
+- Reconhecimento de assinaturas.
+- Identificação de compiladores.
+- Identificação de runtimes.
+- Análise de strings.
+- Análise de dependências.
+- Grafos de chamadas.
+- Reconhecimento de padrões.
+- Análise semântica.
+
+Os resultados devem permitir navegar da função para as referências, chamadas, strings, tipos e instruções relacionadas.
+
+---
+
+# 8. Backends de descompilação por linguagem
+
+Implementar backends especializados, mantendo uma infraestrutura comum.
+
+## 8.1 C e C++
+
+Reconstruir, quando possível:
+
+- Funções.
+- Classes.
+- Métodos.
+- Herança.
+- Vtables.
+- RTTI.
+- Namespaces.
+- Estruturas.
+- Enums.
+- Templates inferíveis.
+- Exceções.
+- Construtores e destrutores.
+- Padrões STL.
+- Operadores.
+- ABI Itanium e Microsoft.
+- Padrões de GCC, Clang e MSVC.
+
+## 8.2 Go
+
+Analisar:
+
+- Funções e métodos.
+- Structs e interfaces.
+- Goroutines e channels.
+- Closures.
+- Metadados de tipos.
+- Runtime.
+- Garbage collector.
+- Dispatch de interfaces.
+- Variações entre versões do compilador.
+
+## 8.3 Rust
+
+Analisar:
+
+- Funções.
+- Structs e enums.
+- Traits quando inferíveis.
+- Generics quando recuperáveis.
+- Closures.
+- Iterators.
+- Async state machines.
+- Mangling.
+- Monomorphization.
+- Trait dispatch.
+- Panic handling.
+- Drop glue.
+
+Não alegar recuperar ownership, lifetimes ou declarações genéricas que não estejam preservadas no binário.
+
+## 8.4 Python
+
+Suportar:
+
+- Bytecode por versão.
+- Funções e classes.
+- Imports.
+- Decorators.
+- Closures.
+- Comprehensions.
+- Generators.
+- Async.
+- Exceções.
+- Extensões nativas CPython.
+- Interações com a Python C API.
+
+## 8.5 Java
+
+Suportar:
+
+- CLASS e JAR.
+- Classes e interfaces.
+- Herança.
+- Generics metadata.
+- Lambdas.
+- Annotations.
+- Exceptions.
+- Streams.
+- Inner classes.
+- Records.
+- Synthetic methods.
+- Diferentes versões de bytecode JVM.
+
+A auditoria do GHIRA pode revelar outras linguagens ou formatos oficiais. Esses devem ser adicionados à matriz de compatibilidade, sem limitar o projeto às cinco linguagens acima.
+
+---
+
+# 9. Pesquisa — velocidade, precisão e experiência
+
+A pesquisa é uma funcionalidade central. Deve ser rápida mesmo em projetos com muitos ficheiros, milhares de funções e grandes volumes de pseudocódigo.
+
+## 9.1 Pesquisa global
+
+Permitir pesquisar:
+
+- Nomes de ficheiros.
+- Funções.
+- Símbolos.
+- Strings.
+- Endereços.
+- Imports e exports.
+- Tipos.
+- Referências.
+- Nomes de classes e métodos.
+- Conteúdo descompilado.
+- Metadados.
+- Resultados de análise.
+
+## 9.2 Otimização do motor
+
+Avaliar e implementar, conforme os resultados dos benchmarks:
+
+- Índices invertidos para pesquisa textual.
+- Índices especializados para símbolos e funções.
+- Estruturas de pesquisa por prefixo.
+- Pesquisa exata e aproximada.
+- Pesquisa por endereço e intervalo.
+- Índices em memória com persistência.
+- Cache de consultas frequentes.
+- Atualização incremental do índice.
+- Deduplicação de trabalho.
+- Pesquisa paralela em conjuntos independentes.
+- Limitação de resultados e paginação.
+- Cancelamento de consultas antigas.
+- Debounce na interface.
+- Atualizações de resultados sem bloquear a GUI.
+
+Evitar reler e analisar todos os ficheiros para cada pesquisa. O índice deve ser reutilizado e atualizado apenas quando necessário.
+
+A pesquisa deve apresentar resultados progressivamente quando o conjunto for grande.
+
+## 9.3 Medição
+
+Registar:
+
+- Tempo de preparação do índice.
+- Tempo de pesquisa a frio.
+- Tempo de pesquisa a quente.
+- Latência até ao primeiro resultado.
+- Latência até aos resultados completos.
+- Número de documentos examinados.
+- Número de resultados.
+- Memória utilizada.
+- Taxa de acerto do cache.
+
+Criar testes com conjuntos pequenos, médios e grandes. Não declarar a pesquisa rápida sem medições reproduzíveis.
+
+---
+
+# 10. Descompilação e exportação de ficheiros grandes
+
+**Este requisito é obrigatório e prioritário.**
+
+O GHIRUST deve conseguir analisar e exportar resultados de ficheiros grandes, incluindo DLLs de aproximadamente 30 MB cuja saída descompilada possa ultrapassar 100 MB, sem depender de carregar todo o resultado na RAM.
+
+O tamanho do ficheiro original não deve ser confundido com o tamanho do resultado descompilado. A saída pode ser várias vezes maior.
+
+## 10.1 Processamento incremental
+
+Implementar uma pipeline de streaming:
+
+1. Abrir o ficheiro de forma eficiente.
+2. Validar o formato e recolher metadados.
+3. Identificar secções e funções.
+4. Processar unidades de análise independentes.
+5. Descompilar uma função ou lote limitado de funções.
+6. Escrever o resultado diretamente para o destino.
+7. Libertar buffers temporários.
+8. Continuar para a unidade seguinte.
+9. Atualizar o progresso e a sessão.
+10. Finalizar e validar o manifesto da exportação.
+
+Não acumular todo o pseudocódigo num único `String`, `Vec` ou objeto em memória.
+
+Não construir um único JSON gigante em RAM para depois o escrever.
+
+## 10.2 Exportação por função
+
+A exportação deve permitir:
+
+- Um ficheiro por função.
+- Organização por módulo ou secção.
+- Manifesto global.
+- Metadados por função.
+- Endereço e nome.
+- Estado da descompilação.
+- Erros e avisos.
+- Referências ao binário de origem.
+- Hash do ficheiro original.
+- Versão do motor e da IR.
+
+Formato sugerido:
+
+```text
+output/
+├── manifest.json
+├── metadata.json
+├── functions/
+│   ├── 00000001_function_a.c
+│   ├── 00000002_function_b.c
+│   └── ...
+├── strings/
+├── symbols/
+├── reports/
+└── logs/
+```
+
+O formato deve permitir também exportação consolidada, mas essa consolidação tem de ser feita em streaming.
+
+## 10.3 Escrita segura e recuperação
+
+Implementar:
+
+- Escrita temporária seguida de rename atómico quando suportado.
+- Flush controlado.
+- Deteção de falta de espaço.
+- Tratamento de permissões e erros de I/O.
+- Manifesto de progresso.
+- Checkpoints.
+- Retoma de exportações interrompidas.
+- Deteção de ficheiros já concluídos.
+- Verificação de integridade.
+- Registo de funções falhadas sem perder as restantes.
+
+Nunca substituir uma exportação válida por uma exportação incompleta sem autorização explícita.
+
+A retoma deve validar o hash do binário, a configuração, a versão do motor e a versão do formato de saída. Se algum destes elementos mudar, explicar por que motivo a sessão não pode ser reutilizada integralmente.
+
+## 10.4 Controlo de memória
+
+Criar limites configuráveis para:
+
+- Memória de trabalho.
+- Tamanho dos lotes.
+- Número de funções em simultâneo.
+- Buffers de leitura e escrita.
+- Cache.
+- Fila de resultados pendentes.
+
+Usar backpressure: se o disco ou o exportador não acompanhar a velocidade de análise, os produtores devem abrandar em vez de acumular resultados indefinidamente.
+
+Preferir memória mapeada ou leitura por blocos quando apropriado. Não mapear ficheiros inteiros indiscriminadamente sem considerar limites do sistema operativo e arquitetura.
+
+## 10.5 Testes obrigatórios de ficheiros grandes
+
+Criar testes com:
+
+- DLL de 30 MB.
+- DLL cuja saída descompilada ultrapasse 100 MB.
+- Ficheiro com muitas funções pequenas.
+- Ficheiro com poucas funções muito grandes.
+- Ficheiro com funções parcialmente inválidas.
+- Falta de espaço durante a exportação.
+- Interrupção forçada e retoma.
+- Cancelamento pelo utilizador.
+- Limite de RAM configurado.
+- Exportação consolidada e exportação por função.
+
+Medir pico de RAM, tamanho final, tempo total, throughput, funções concluídas e integridade dos resultados.
+
+**Critério de aceitação:** o consumo de memória deve permanecer limitado pelo orçamento configurado e não crescer proporcionalmente ao tamanho total do pseudocódigo acumulado.
+
+---
+
+# 11. Cache e sessões
+
+O cache deve guardar, conforme apropriado:
+
+- Metadados.
+- Hashes.
+- Funções detetadas.
+- Símbolos.
+- Tipos.
+- CFG.
+- Resultados de análise.
+- GUIR.
+- Resultados de descompilação.
+
+Requisitos:
+
+- Chaves baseadas no conteúdo e configuração.
+- Versionamento.
+- Invalidação incremental.
+- Escrita atómica.
+- Recuperação de corrupção.
+- Evicção por orçamento.
+- Concorrência segura.
+- Estatísticas.
+- Diagnósticos visíveis.
+
+Uma falha de cache não deve provocar perda silenciosa de resultados nem impedir desnecessariamente a análise principal.
+
+As sessões devem guardar estado, opções, progresso, resultados e informação necessária para retomar tarefas suportadas.
+
+---
+
+# 12. Interface — GHIRUST Command Center
+
+**A interface deve ser desenhada para utilizadores principiantes e avançados.**
+
+Não basta apresentar métricas técnicas e botões sem contexto. Cada operação deve ser compreensível, previsível e acompanhada por explicações simples.
+
+Usar uma GUI nativa, preferencialmente `egui` se continuar a ser a opção mais adequada à arquitetura existente.
+
+## 12.1 Princípios de UX
+
+- Interface clara e consistente.
+- Navegação simples.
+- Hierarquia visual evidente.
+- Nomes compreensíveis.
+- Tooltips explicativos.
+- Mensagens de erro acionáveis.
+- Estados de progresso claros.
+- Operações perigosas confirmadas.
+- Configurações avançadas separadas das opções comuns.
+- Atalhos de teclado.
+- Suporte a escalas de ecrã e redimensionamento.
+- Acessibilidade e contraste.
+- Localização completa.
+
+Não expor dezenas de opções técnicas no primeiro ecrã.
+
+## 12.2 Primeiro arranque
+
+No primeiro arranque, apresentar um assistente simples:
+
+1. Escolher idioma.
+2. Escolher tema visual.
+3. Detetar hardware disponível.
+4. Verificar dependências.
+5. Escolher pasta de trabalho.
+6. Explicar como abrir um ficheiro.
+7. Permitir iniciar uma análise de demonstração.
+
+O assistente deve poder ser repetido nas definições.
+
+## 12.3 Ecrã inicial
+
+O ecrã principal deve apresentar ações evidentes:
+
+- **Abrir ficheiro**
+- **Abrir pasta/projeto**
+- **Retomar sessão**
+- **Ver análises recentes**
+- **Pesquisar**
+- **Comparar resultados**
+- **Definições**
+
+A ação principal deve ser visualmente destacada sem sobrecarregar o ecrã.
+
+## 12.4 Fluxo de análise para principiantes
+
+Criar um fluxo guiado:
+
+**Passo 1 — Selecionar ficheiro**
+
+Arrastar e largar ou selecionar um ficheiro.
+
+**Passo 2 — Inspecionar**
+
+Mostrar nome, tamanho, formato detetado, arquitetura e avisos.
+
+**Passo 3 — Escolher análise**
+
+Disponibilizar um perfil recomendado, por exemplo:
+
+- Análise rápida.
+- Análise completa.
+- Análise personalizada.
+
+Explicar em linguagem simples o que cada perfil faz.
+
+**Passo 4 — Executar**
+
+Mostrar progresso real, fase atual e operações concluídas.
+
+**Passo 5 — Explorar resultados**
+
+Abrir a vista de funções, strings, símbolos, imports, exports e pseudocódigo.
+
+**Passo 6 — Exportar**
+
+Permitir exportar tudo, funções selecionadas ou resultados específicos.
+
+## 12.5 Navegação principal
+
+Organizar a interface em áreas claras:
+
+- Início.
+- Análises.
+- Descompilador.
+- Funções.
+- Desassemblagem.
+- Strings.
+- Símbolos.
+- Imports e exports.
+- Pesquisa.
+- Grafos.
+- Exportações.
+- Sessões.
+- Command Center.
+- Definições.
+
+As secções devem ser ativadas de acordo com as capacidades realmente disponíveis. Não apresentar ecrãs vazios que aparentem funcionalidades concluídas.
+
+## 12.6 Visualizador de pseudocódigo
+
+Implementar um editor/visualizador com:
+
+- Syntax highlighting.
+- Números de linha.
+- Pesquisa no conteúdo.
+- Navegação por funções.
+- Ir para endereço.
+- Referências cruzadas clicáveis.
+- Navegação entre chamadas.
+- Copiar seleção.
+- Exportar função.
+- Mostrar metadados e confiança.
+- Mostrar avisos de reconstrução.
+- Separação entre código, assembly e informação de análise.
+
+Para saídas muito grandes, utilizar visualização virtualizada e carregamento por blocos. Não carregar 100 MB de texto integralmente no widget de interface.
+
+## 12.7 Pesquisa visual
+
+A barra de pesquisa deve ser global e fácil de encontrar.
+
+Disponibilizar filtros simples e filtros avançados:
+
+- Tipo de resultado.
+- Ficheiro.
+- Módulo.
+- Endereço.
+- Linguagem.
+- Confiança.
+- Intervalo de endereços.
+
+Mostrar resultados progressivamente e permitir cancelar a consulta.
+
+## 12.8 Interface avançada
+
+Utilizadores experientes devem poder aceder a:
+
+- Configuração de workers.
+- Threads.
+- Prioridades.
+- Orçamento de RAM.
+- Orçamento de VRAM.
+- Modo CPU/GPU.
+- Opções de análise.
+- Configuração de cache.
+- Logs e tracing.
+- Diagnósticos técnicos.
+
+As opções avançadas não devem tornar a interface básica difícil de compreender.
+
+---
+
+# 13. Command Center e monitorização
+
+Mostrar dados reais, com origem e limitações claramente identificadas.
+
+## 13.1 Dashboard
+
+- CPU total e por núcleo.
+- RAM do processo.
+- RAM disponível.
+- GPU e VRAM.
+- Workers e threads.
+- Tarefas pendentes, ativas e concluídas.
+- Progresso.
+- Tempo decorrido.
+- Velocidade de processamento.
+
+## 13.2 Monitor de tarefas
+
+Estados:
+
+- QUEUED
+- RUNNING
+- WAITING
+- COMPLETED
+- FAILED
+- CANCELLED
+
+Cada tarefa deve mostrar:
+
+- ID.
+- Módulo.
+- Dispositivo.
+- Duração.
+- Progresso.
+- Prioridade.
+- Dependências.
+- Memória atribuída ou estimada.
+- Estado.
+- Mensagens de erro.
+
+## 13.3 Scheduler
+
+Mostrar por que motivo uma tarefa foi atribuída à CPU ou GPU, incluindo:
+
+- Paralelismo estimado.
+- Volume de dados.
+- Recursos disponíveis.
+- Transferências previstas.
+- Dependências.
+- Histórico medido.
+- Decisão final.
+
+Distinguir estimativas de medições reais.
+
+## 13.4 Controlos
+
+- Automático.
+- Prioridade CPU.
+- Prioridade GPU.
+- Limite de threads.
+- Limite de workers.
+- Orçamento de RAM.
+- Orçamento de VRAM.
+- Prioridade de tarefas.
+- Pausar.
+- Retomar.
+- Cancelar.
+
+Os limites devem ser descritos corretamente: um limite é rígido apenas se o mecanismo subjacente conseguir garanti-lo.
+
+---
+
+# 14. Pesquisa de desempenho e processamento paralelo
+
+Implementar:
+
+- Rayon para paralelismo CPU quando adequado.
+- Tokio para orquestração assíncrona quando adequado.
+- Filas de prioridade.
+- Work stealing.
+- Deduplicação de tarefas.
+- Gestão de dependências.
+- Backpressure.
+- Cancelamento.
+- Recuperação de falhas.
+- Limites de concorrência.
+
+O scheduler deve escolher CPU/GPU com base em medições, não em regras promocionais.
+
+CPU e GPU podem executar tarefas independentes em simultâneo. Evitar sincronizações desnecessárias.
+
+---
+
+# 15. Performance Intelligence
+
+Detetar e explicar:
+
+- CPU saturada.
+- GPU subutilizada.
+- Pressão de memória.
+- Pressão de VRAM.
+- Transferências excessivas.
+- Filas congestionadas.
+- Cache pouco eficiente.
+- Operações lentas.
+- Esperas de I/O.
+- Contenção e sincronização.
+
+As recomendações devem resultar de métricas reais. Não modificar automaticamente configurações críticas sem autorização.
+
+---
+
+# 16. Internacionalização
+
+Idiomas obrigatórios:
+
+- `pt-PT`
+- `pt-BR`
+- `en-US`
+- `ru-RU`
+
+Traduzir:
+
+- Menus.
+- Botões.
+- Tooltips.
+- Mensagens.
+- Erros.
+- Definições.
+- Relatórios.
+- Command Center.
+- Assistente inicial.
+
+Permitir alteração de idioma sem reiniciar a aplicação, quando possível.
+
+Validar a completude das traduções. Não traduzir identificadores internos, códigos de eventos ou campos destinados a máquinas.
+
+---
+
+# 17. Integração Ghidra e interoperabilidade
+
+A integração com Ghidra deve ser implementada com base na versão e APIs reais presentes no ambiente e no código original.
+
+Criar uma ponte que, quando validada:
+
+- Exporte funções individualmente.
+- Exporte metadados.
+- Registe endereços, nomes e assinaturas.
+- Produza manifesto estruturado.
+- Preserve UTF-8.
+- Registe erros por função.
+- Permita importação pelo GHIRUST.
+- Suporte lotes grandes e exportação interrompida.
+
+Não declarar a integração concluída sem compilar e executar os scripts contra a versão real do Ghidra.
+
+---
+
+# 18. Estrutura do projeto
+
+A estrutura final deve evoluir a partir do workspace existente, não ser imposta por uma reorganização destrutiva.
+
+Estrutura lógica desejada:
+
+```text
+ghirust/
+├── Cargo.toml
+├── crates/
+│   ├── ghirust-core/
+│   ├── ghirust-cli/
+│   ├── ghirust-gui/
+│   ├── ghirust-ir/
+│   ├── ghirust-formats/
+│   ├── ghirust-analysis/
+│   ├── ghirust-search/
+│   ├── ghirust-export/
+│   ├── ghirust-scheduler/
+│   ├── ghirust-monitoring/
+│   └── ghirust-localization/
+├── native/
+│   ├── cpp/
+│   └── ffi/
+├── compute/
+│   ├── cpu/
+│   ├── gpu/
+│   └── hybrid/
+├── integrations/
+│   └── ghidra/
+├── resources/
+│   └── locales/
+│       ├── pt-PT/
+│       ├── pt-BR/
+│       ├── en-US/
+│       └── ru-RU/
+├── docs/
+│   ├── architecture.md
+│   ├── ghira_compatibility_matrix.md
+│   ├── user_guide.md
+│   └── testing.md
+├── tests/
+│   ├── unit/
+│   ├── integration/
+│   ├── regression/
+│   ├── large_files/
+│   ├── objectives/
+│   └── performance/
+└── README.md
+```
+
+Esta estrutura é uma orientação arquitetural. Não mover módulos existentes sem avaliar dependências, histórico e impacto.
+
+---
+
+# 19. Testes e validação
+
+## 19.1 Testes funcionais
+
+Cada módulo deve ter testes unitários, integração e regressão.
+
+## 19.2 Testes de compatibilidade
+
+Comparar as funcionalidades do GHIRA original e do GHIRUST, com a mesma entrada e configurações equivalentes.
+
+## 19.3 Testes de pesquisa
+
+Testar:
+
+- Índice vazio.
+- Índice pequeno.
+- Índice grande.
+- Muitas funções.
+- Muitos símbolos.
+- Pesquisa exata.
+- Pesquisa parcial.
+- Pesquisa aproximada.
+- Pesquisa concorrente.
+- Atualização incremental.
+- Cache frio e quente.
+
+## 19.4 Testes de ficheiros grandes
+
+Usar ficheiros reais e gerados, incluindo DLL de 30 MB e exportações superiores a 100 MB.
+
+Validar integridade, retoma, consumo de memória, throughput e ausência de corrupção.
+
+## 19.5 Testes de interface
+
+Testar:
+
+- Primeiro arranque.
+- Seleção de ficheiro.
+- Análise.
+- Progresso.
+- Cancelamento.
+- Retoma.
+- Pesquisa.
+- Navegação.
+- Exportação.
+- Erros.
+- Localização.
+- Redimensionamento.
+- Ficheiros grandes.
+
+## 19.6 Comparação GHIRA vs GHIRUST
+
+Usar o mesmo binário, confirmado por hash, em ambos os sistemas.
+
+Separar:
+
+- Tempo de carregamento.
+- Tempo de análise.
+- Tempo de descompilação.
+- Tempo de exportação.
+- Tempo de pesquisa.
+- Número de funções encontradas.
+- Número de funções descompiladas.
+- RAM máxima.
+- VRAM máxima.
+- CPU e GPU.
+- Qualidade da reconstrução.
+- Erros e avisos.
+
+Comparar a qualidade com o código-fonte original, quando disponível. Não utilizar apenas semelhança textual.
+
+Executar várias repetições e separar cache frio de cache quente.
+
+Não inventar métricas nem atribuir resultados artificiais a funcionalidades não suportadas.
+
+---
+
+# 20. Critérios de aceitação finais
+
+O GHIRUST não pode ser considerado concluído apenas por compilar ou abrir uma DLL.
+
+A conclusão exige:
+
+1. Auditoria documentada do GHIRA original.
+2. Matriz de compatibilidade preenchida.
+3. Funcionalidades oficiais reproduzidas ou diferenças justificadas.
+4. Interface funcional e compreensível para principiantes.
+5. Pesquisa medida e otimizada.
+6. Exportação incremental de ficheiros grandes.
+7. Testes de DLL de 30 MB e saída superior a 100 MB.
+8. Retoma de exportações interrompidas.
+9. Consumo de memória controlado.
+10. Backends e formatos testados individualmente.
+11. Integração Ghidra validada, se incluída.
+12. Monitorização baseada em dados reais.
+13. Localizações completas.
+14. Testes de regressão aprovados.
+15. Comparação reproduzível com GHIRA.
+
+---
+
+# 21. Regras obrigatórias de desenvolvimento
+
+- Não criar funcionalidades fictícias.
+- Não usar placeholders apresentados como implementação concluída.
+- Não esconder erros.
+- Não apagar funcionalidades originais sem justificação.
+- Não substituir código funcional sem testes de regressão.
+- Não reescrever o projeto inteiro desnecessariamente.
+- Não carregar resultados gigantes integralmente em RAM.
+- Não bloquear a interface durante operações demoradas.
+- Não assumir que GPU é sempre mais rápida.
+- Não declarar suporte sem testes.
+- Não inventar APIs do Ghidra.
+- Não eliminar metadados específicos das linguagens.
+- Não misturar resultados inferidos com informação confirmada.
+- Não alterar ficheiros do projeto original sem autorização.
+- Atualizar documentação e testes a cada funcionalidade concluída.
+
+**Prioridade de desenvolvimento:**
+
+`Paridade GHIRA → Correção → Interface → Ficheiros grandes → Pesquisa → Observabilidade → Desempenho → Otimização`
+
+O objetivo final é uma aplicação completa, coerente e utilizável, não apenas um conjunto de bibliotecas ou uma demonstração técnica.

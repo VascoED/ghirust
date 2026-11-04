@@ -89,7 +89,10 @@ pub fn run(args: &SearchArgs, json: bool, verbose: bool) -> Result<()> {
             report.query,
             mode_name(report.mode)
         );
-        println!("Try `ghirust search --mode name {}` or a shorter query.", report.query);
+        println!(
+            "Try `ghirust search --mode name {}` or a shorter query.",
+            report.query
+        );
         return Ok(());
     }
 

@@ -130,7 +130,8 @@ impl Module {
 
     /// Whether validation found no errors.
     pub fn is_valid(&self) -> bool {
-        !self.validate()
+        !self
+            .validate()
             .iter()
             .any(|issue| issue.severity == Severity::Error)
     }
@@ -198,7 +199,11 @@ fn validate_function(function: &Function, issues: &mut Vec<ValidationIssue>) {
                 ));
             }
         }
-        for operand in block.instructions.iter().flat_map(|instruction| &instruction.operands) {
+        for operand in block
+            .instructions
+            .iter()
+            .flat_map(|instruction| &instruction.operands)
+        {
             if let Operand::Block(target) = operand {
                 if !block_ids.contains(target) {
                     issues.push(ValidationIssue::error(
@@ -311,6 +316,8 @@ pub enum Op {
     Load,
     /// Memory store.
     Store,
+    /// Load effective address.
+    Lea,
     /// Integer or floating-point addition.
     Add,
     /// Subtraction.
@@ -341,6 +348,8 @@ pub enum Op {
     Call,
     /// SSA phi node.
     Phi,
+    /// Arithmetic negation.
+    Neg,
     /// An operation not yet modelled.
     Unknown(String),
 }
@@ -363,6 +372,25 @@ pub enum Operand {
     Symbol(String),
     /// String literal.
     String(String),
+    /// Register name.
+    Register(String),
+    /// Memory operand.
+    Memory(Box<MemoryOperand>),
+}
+
+/// Memory operand used by a GUIR instruction.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MemoryOperand {
+    /// Base register.
+    pub base: Option<String>,
+    /// Index register.
+    pub index: Option<String>,
+    /// Index scale.
+    pub scale: u32,
+    /// Displacement.
+    pub displacement: u64,
+    /// Access size in bytes.
+    pub size: u16,
 }
 
 /// How control leaves a basic block.
@@ -554,9 +582,11 @@ mod tests {
         let mut module = valid_module();
         module.functions[0].blocks[0].terminator = Terminator::Jump(99);
         let issues = module.validate();
-        assert!(issues
-            .iter()
-            .any(|issue| issue.code == "terminator.missing_block"));
+        assert!(
+            issues
+                .iter()
+                .any(|issue| issue.code == "terminator.missing_block")
+        );
         assert!(!module.is_valid());
     }
 
@@ -564,20 +594,24 @@ mod tests {
     fn duplicate_block_id_is_an_error() {
         let mut module = valid_module();
         module.functions[0].blocks[1].id = 0;
-        assert!(module
-            .validate()
-            .iter()
-            .any(|issue| issue.code == "block.duplicate_id"));
+        assert!(
+            module
+                .validate()
+                .iter()
+                .any(|issue| issue.code == "block.duplicate_id")
+        );
     }
 
     #[test]
     fn entry_must_exist() {
         let mut module = valid_module();
         module.functions[0].entry = Some(42);
-        assert!(module
-            .validate()
-            .iter()
-            .any(|issue| issue.code == "function.entry_missing"));
+        assert!(
+            module
+                .validate()
+                .iter()
+                .any(|issue| issue.code == "function.entry_missing")
+        );
     }
 
     #[test]
@@ -594,9 +628,11 @@ mod tests {
         let mut module = valid_module();
         module.functions[0].name.clear();
         let issues = module.validate();
-        assert!(issues
-            .iter()
-            .any(|issue| issue.code == "function.empty_name"));
+        assert!(
+            issues
+                .iter()
+                .any(|issue| issue.code == "function.empty_name")
+        );
         assert!(module.is_valid());
     }
 }

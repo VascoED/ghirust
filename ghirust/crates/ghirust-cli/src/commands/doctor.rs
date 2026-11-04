@@ -110,11 +110,19 @@ pub fn run(root: &Path, json: bool) -> Result<()> {
         }
     }
 
-    let required_ok = checks.iter().filter(|check| check.required).all(|check| check.ok);
+    let required_ok = checks
+        .iter()
+        .filter(|check| check.required)
+        .all(|check| check.ok);
     println!();
     if required_ok {
         println!("Search and export are ready to use.");
-        if !checks.iter().find(|check| check.name == "search index").map(|check| check.ok).unwrap_or(false) {
+        if !checks
+            .iter()
+            .find(|check| check.name == "search index")
+            .map(|check| check.ok)
+            .unwrap_or(false)
+        {
             println!("Next: `ghirust index` to make the first search fast.");
         }
     } else {
@@ -189,16 +197,27 @@ fn inspect_ghidra() -> (bool, String) {
         }
         return (
             false,
-            format!("GHIDRA_HOME is set to {}, but support/analyzeHeadless was not found", home.display()),
+            format!(
+                "GHIDRA_HOME is set to {}, but support/analyzeHeadless was not found",
+                home.display()
+            ),
         );
     }
 
-    for candidate in ["ghidraRun", "ghidraRun.bat", "analyzeHeadless", "analyzeHeadless.bat"] {
+    for candidate in [
+        "ghidraRun",
+        "ghidraRun.bat",
+        "analyzeHeadless",
+        "analyzeHeadless.bat",
+    ] {
         if which(candidate).is_some() {
             return (true, format!("{candidate} is available on PATH"));
         }
     }
-    (false, "not found; set GHIDRA_HOME to your installation".to_owned())
+    (
+        false,
+        "not found; set GHIDRA_HOME to your installation".to_owned(),
+    )
 }
 
 fn which(program: &str) -> Option<PathBuf> {

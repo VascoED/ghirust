@@ -102,7 +102,14 @@ fn scan_ascii(
         }
         if index - start >= options.min_length {
             let value = String::from_utf8_lossy(&bytes[start..index]).to_string();
-            push(records, seen, options, start as u64, StringEncoding::Ascii, value);
+            push(
+                records,
+                seen,
+                options,
+                start as u64,
+                StringEncoding::Ascii,
+                value,
+            );
         }
     }
 }
@@ -181,7 +188,11 @@ mod tests {
         fs::write(&path, bytes).unwrap();
 
         let records = extract_strings(&path, &StringOptions::default()).unwrap();
-        assert!(records.iter().any(|record| record.value == "Hello, GHIRUST"));
+        assert!(
+            records
+                .iter()
+                .any(|record| record.value == "Hello, GHIRUST")
+        );
         assert!(records.iter().any(|record| record.value == "WideString"));
         assert!(records.iter().all(|record| record.value.len() >= 4));
     }

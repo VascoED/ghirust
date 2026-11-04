@@ -44,7 +44,9 @@ pub fn run(verbose: bool) -> Result<()> {
         }
     }
 
-    println!("\nDone. Run `ghirust --help` for every command, or `ghirust doctor` if something looks wrong.");
+    println!(
+        "\nDone. Run `ghirust --help` for every command, or `ghirust doctor` if something looks wrong."
+    );
     Ok(())
 }
 
@@ -77,18 +79,24 @@ fn guided_search(verbose: bool) -> Result<()> {
     };
     println!("\nPreparing the index (a one-time cost for this folder)...");
     search::run(&args, false, verbose)?;
-    println!("\nNext: use `ghirust search name:<part-of-name>` to narrow by symbol, or `ghirust search --help`.");
+    println!(
+        "\nNext: use `ghirust search name:<part-of-name>` to narrow by symbol, or `ghirust search --help`."
+    );
     Ok(())
 }
 
 fn guided_export(verbose: bool) -> Result<()> {
-    println!("\nThis combines many small function files into one output without loading everything into RAM.");
+    println!(
+        "\nThis combines many small function files into one output without loading everything into RAM."
+    );
     let input = ask(
         "Folder of function files (or an NDJSON file)",
         "ghidra-export",
     )?;
     if !PathBuf::from(&input).exists() {
-        println!("\nThat path does not exist yet. If you are starting from a binary, export it first with the Ghidra bridge:");
+        println!(
+            "\nThat path does not exist yet. If you are starting from a binary, export it first with the Ghidra bridge:"
+        );
         println!("  integrations/ghidra/run-export.ps1 <binary> <output-folder>");
         println!("Then run this option again.");
         return Ok(());

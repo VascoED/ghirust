@@ -8,12 +8,15 @@ description = "Core indexing, search and bounded-memory export primitives for GH
 
 [dependencies]
 flate2.workspace = true
+iced-x86.workspace = true
 memchr.workspace = true
 memmap2.workspace = true
+object.workspace = true
 rayon.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
+sysinfo.workspace = true
 thiserror.workspace = true
 walkdir.workspace = true
 

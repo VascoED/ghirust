@@ -13,6 +13,7 @@ use memmap2::Mmap;
 use crate::error::{GhirustError, IoResultExt, Result};
 
 /// A read-only memory map of a file.
+#[derive(Debug)]
 pub struct ReadOnlyMap {
     map: Mmap,
 }

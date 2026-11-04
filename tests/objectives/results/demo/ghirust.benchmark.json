@@ -1,0 +1,75 @@
+{
+  "core_analysis_ms": {
+    "max": 7,
+    "mean": 6.666666666666667,
+    "median": 7,
+    "min": 6
+  },
+  "decompile": true,
+  "file": "./tests\\objectives\\binaries\\demo.dll",
+  "file_bytes": 9728,
+  "runs": 3,
+  "samples": [
+    {
+      "analysis_ms": 7,
+      "blocks": 221,
+      "functions": 57,
+      "instructions": 898,
+      "wall_ms": 8,
+      "xrefs": 590
+    },
+    {
+      "analysis_ms": 7,
+      "blocks": 221,
+      "functions": 57,
+      "instructions": 898,
+      "wall_ms": 8,
+      "xrefs": 590
+    },
+    {
+      "analysis_ms": 6,
+      "blocks": 221,
+      "functions": 57,
+      "instructions": 898,
+      "wall_ms": 7,
+      "xrefs": 590
+    }
+  ],
+  "sha256": "8e333cc5e9f91a82c675beaf108e8cfccb33e9d5e2c34e8c8fb30705cedd8773",
+  "stats": {
+    "blocks": 221,
+    "elapsed_ms": 6,
+    "functions": 57,
+    "functions_from_calls": 0,
+    "instructions": 898,
+    "linear_scan_instructions": 1328,
+    "overlapping_functions_skipped": 74,
+    "seeds": 131,
+    "truncated": false,
+    "xrefs": 590
+  },
+  "wall_ms": {
+    "max": 8,
+    "mean": 7.666666666666667,
+    "median": 8,
+    "min": 7
+  },
+  "warnings": [
+    "linear sweep decoded 1328 instruction(s) across 1 executable section(s)",
+    "demo_sum_loop: instruction 'movq' at 0x1800010a0 has no semantic model",
+    "demo_sum_loop: instruction 'paddq' at 0x1800010af has no semantic model",
+    "demo_sum_loop: instruction 'pshufd' at 0x1800010c8 has no semantic model",
+    "demo_sum_loop: instruction 'punpckldq' at 0x1800010ab has no semantic model",
+    "FUN_180001150: instruction 'int3' at 0x180001254 has no semantic model",
+    "FUN_180001260: instruction 'int3' at 0x1800012f9 has no semantic model",
+    "FUN_1800014e0: instruction 'cmpxchg' at 0x1800014fc has no semantic model",
+    "FUN_180001570: instruction 'movdqa' at 0x1800015ad has no semantic model",
+    "FUN_180001570: instruction 'movdqu' at 0x1800015b5 has no semantic model",
+    "FUN_1800017d0: instruction 'xchg' at 0x1800017e8 has no semantic model",
+    "FUN_180001990: instruction 'int' at 0x180001992 has no semantic model",
+    "FUN_180001a50: instruction 'bt' at 0x180001b13 has no semantic model",
+    "FUN_180001a50: instruction 'btr' at 0x180001c77 has no semantic model",
+    "FUN_180001a50: instruction 'cpuid' at 0x180001a62 has no semantic model",
+    "FUN_180001a50: instruction 'xgetbv' at 0x180001bbe has no semantic model"
+  ]
+}

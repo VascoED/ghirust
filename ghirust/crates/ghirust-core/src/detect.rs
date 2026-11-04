@@ -275,7 +275,9 @@ fn parse_pe(bytes: &[u8], size: u64) -> DetectionReport {
 
     let pe_offset = Endian::Little.u32(bytes, 0x3c).unwrap_or(0) as usize;
     if bytes.get(pe_offset..pe_offset + 4) != Some(b"PE\0\0") {
-        report.warnings.push("MZ file without a valid PE header".to_owned());
+        report
+            .warnings
+            .push("MZ file without a valid PE header".to_owned());
         report.confidence = 0.4;
         return report;
     }
@@ -320,7 +322,9 @@ fn parse_pe(bytes: &[u8], size: u64) -> DetectionReport {
         if cli.map(|rva| rva != 0).unwrap_or(false) {
             report.language = Some("C# / .NET (CLR)".to_owned());
             report.language_confidence = 0.9;
-            report.evidence.push("PE CLI data directory is present".to_owned());
+            report
+                .evidence
+                .push("PE CLI data directory is present".to_owned());
         }
     }
 
@@ -335,8 +339,7 @@ fn parse_pe(bytes: &[u8], size: u64) -> DetectionReport {
         };
         let name = fixed_name(&header[..8]);
         let virtual_size = u32::from_le_bytes([header[8], header[9], header[10], header[11]]);
-        let virtual_address =
-            u32::from_le_bytes([header[12], header[13], header[14], header[15]]);
+        let virtual_address = u32::from_le_bytes([header[12], header[13], header[14], header[15]]);
         let raw_size = u32::from_le_bytes([header[16], header[17], header[18], header[19]]);
         let section_characteristics =
             u32::from_le_bytes([header[36], header[37], header[38], header[39]]);
@@ -369,7 +372,11 @@ fn parse_elf(bytes: &[u8], size: u64) -> DetectionReport {
 
     let class = bytes.get(4).copied().unwrap_or(0);
     let data = bytes.get(5).copied().unwrap_or(0);
-    let endian = if data == 2 { Endian::Big } else { Endian::Little };
+    let endian = if data == 2 {
+        Endian::Big
+    } else {
+        Endian::Little
+    };
     report.endian = Some(endian);
     report.bits = Some(if class == 2 { 64 } else { 32 });
 
@@ -442,12 +449,7 @@ fn parse_elf_section_headers(
 ) {
     let entry_size = shentsize as usize;
     let base = shoff as usize;
-    let shstrndx = if class == 2 {
-        endian.u16(bytes, base + entry_size * 6)
-    } else {
-        endian.u16(bytes, base + entry_size * 6)
-    }
-    .unwrap_or(0) as usize;
+    let shstrndx = endian.u16(bytes, base + entry_size * 6).unwrap_or(0) as usize;
 
     let mut strtab_offset = 0u64;
     let mut strtab_size = 0u64;
@@ -597,10 +599,7 @@ fn complete_elf_sections(
         let flags = if class == 2 {
             endian.u64(&buffer, offset + 8).unwrap_or(0)
         } else {
-            endian
-                .u32(&buffer, offset + 8)
-                .map(u64::from)
-                .unwrap_or(0)
+            endian.u32(&buffer, offset + 8).map(u64::from).unwrap_or(0)
         };
         let (address, section_size) = if class == 2 {
             (
@@ -609,14 +608,8 @@ fn complete_elf_sections(
             )
         } else {
             (
-                endian
-                    .u32(&buffer, offset + 12)
-                    .map(u64::from)
-                    .unwrap_or(0),
-                endian
-                    .u32(&buffer, offset + 20)
-                    .map(u64::from)
-                    .unwrap_or(0),
+                endian.u32(&buffer, offset + 12).map(u64::from).unwrap_or(0),
+                endian.u32(&buffer, offset + 20).map(u64::from).unwrap_or(0),
             )
         };
         let name = c_string(&strtab, name_offset).unwrap_or_else(|| format!("section_{index}"));
@@ -655,10 +648,7 @@ fn parse_macho(bytes: &[u8], size: u64) -> DetectionReport {
     };
     // The byte order is encoded by which magic we saw; for the common
     // little-endian files the stored fields are little-endian.
-    let endian = if matches!(
-        magic,
-        [0xce, 0xfa, 0xed, 0xfe] | [0xcf, 0xfa, 0xed, 0xfe]
-    ) {
+    let endian = if matches!(magic, [0xce, 0xfa, 0xed, 0xfe] | [0xcf, 0xfa, 0xed, 0xfe]) {
         Endian::Little
     } else {
         endian
@@ -691,7 +681,9 @@ fn parse_macho(bytes: &[u8], size: u64) -> DetectionReport {
             break;
         };
         if cmdsize < 8 {
-            report.warnings.push("invalid Mach-O load command size".to_owned());
+            report
+                .warnings
+                .push("invalid Mach-O load command size".to_owned());
             break;
         }
         let command = cmd & 0x7fff_ffff;
@@ -704,9 +696,7 @@ fn parse_macho(bytes: &[u8], size: u64) -> DetectionReport {
                 (8, 48, 56, 68)
             };
             let segment_name = c_string(bytes, offset + name_offset).unwrap_or_default();
-            let nsects = endian
-                .u32(bytes, offset + nsects_offset)
-                .unwrap_or(0) as usize;
+            let nsects = endian.u32(bytes, offset + nsects_offset).unwrap_or(0) as usize;
             let mut section_cursor = offset + section_offset;
             for _ in 0..nsects.min(1024) {
                 let section_name = c_string(bytes, section_cursor).unwrap_or_default();
@@ -758,9 +748,9 @@ fn parse_java_or_fat_macho(bytes: &[u8], size: u64) -> DetectionReport {
     // Java stores minor/major versions at offsets 4 and 6; fat Mach-O stores
     // an architecture count there.
     let fat_count = u32::from_be_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]);
-    let first_cpu = bytes.get(8..12).map(|slice| {
-        u32::from_be_bytes([slice[0], slice[1], slice[2], slice[3]])
-    });
+    let first_cpu = bytes
+        .get(8..12)
+        .map(|slice| u32::from_be_bytes([slice[0], slice[1], slice[2], slice[3]]));
     let looks_like_fat = (1..=64).contains(&fat_count)
         && first_cpu
             .map(|cpu| macho_cpu(cpu).is_some() || cpu & 0xff00_0000 == 0x0100_0000)
@@ -772,7 +762,9 @@ fn parse_java_or_fat_macho(bytes: &[u8], size: u64) -> DetectionReport {
         report.kind = Some("universal binary".to_owned());
         report.confidence = 0.95;
         report.evidence.push("Mach-O fat header".to_owned());
-        report.warnings.push("universal binaries contain multiple architectures".to_owned());
+        report
+            .warnings
+            .push("universal binaries contain multiple architectures".to_owned());
         return report;
     }
 
@@ -819,10 +811,25 @@ fn scan_language_hints(
         (b"core::panicking", "Rust", 0.85, Some("rustc")),
         (b"RUST_BACKTRACE", "Rust", 0.7, Some("rustc")),
         (b"mscorlib", "C# / .NET", 0.8, Some(".NET runtime")),
-        (b"System.Private.CoreLib", "C# / .NET", 0.85, Some(".NET runtime")),
+        (
+            b"System.Private.CoreLib",
+            "C# / .NET",
+            0.85,
+            Some(".NET runtime"),
+        ),
         (b"_CorExeMain", "C# / .NET", 0.8, Some(".NET runtime")),
-        (b"objc_msgSend", "Objective-C", 0.8, Some("Apple Objective-C runtime")),
-        (b"__objc", "Objective-C", 0.65, Some("Apple Objective-C runtime")),
+        (
+            b"objc_msgSend",
+            "Objective-C",
+            0.8,
+            Some("Apple Objective-C runtime"),
+        ),
+        (
+            b"__objc",
+            "Objective-C",
+            0.65,
+            Some("Apple Objective-C runtime"),
+        ),
         (b"swift_", "Swift", 0.7, Some("Swift runtime")),
         (b"java/lang/", "Java", 0.7, Some("JVM")),
         (b"Py_Initialize", "Python", 0.6, Some("CPython")),
@@ -842,7 +849,10 @@ fn scan_language_hints(
                 "found marker '{}'",
                 String::from_utf8_lossy(needle)
             ));
-            if best.map(|(_, value, _)| *confidence > value).unwrap_or(true) {
+            if best
+                .map(|(_, value, _)| *confidence > value)
+                .unwrap_or(true)
+            {
                 best = Some((language, *confidence, compiler.unwrap_or("unknown")));
             }
         }
@@ -866,7 +876,10 @@ fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
 }
 
 fn fixed_name(bytes: &[u8]) -> String {
-    let end = bytes.iter().position(|byte| *byte == 0).unwrap_or(bytes.len());
+    let end = bytes
+        .iter()
+        .position(|byte| *byte == 0)
+        .unwrap_or(bytes.len());
     String::from_utf8_lossy(&bytes[..end]).trim().to_owned()
 }
 
@@ -983,7 +996,12 @@ mod tests {
         assert_eq!(report.architecture.as_deref(), Some("x86-64"));
         assert_eq!(report.bits, Some(64));
         assert_eq!(report.entry_point, Some(0x1400_1000));
-        assert!(report.sections.iter().any(|section| section.name == ".text"));
+        assert!(
+            report
+                .sections
+                .iter()
+                .any(|section| section.name == ".text")
+        );
     }
 
     #[test]

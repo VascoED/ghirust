@@ -4,9 +4,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use clap::Args;
-use ghirust_core::export::{
-    Compression, ExportOptions, export_input,
-};
+use ghirust_core::export::{Compression, ExportOptions, export_input};
 
 use crate::ui;
 
@@ -102,13 +100,13 @@ pub fn run(args: &ExportArgs, json: bool, verbose: bool) -> Result<()> {
         ui::bytes(report.written_bytes)
     );
     if report.resumed_from > 0 {
-        println!("Resumed from {} already-exported function(s).", report.resumed_from);
+        println!(
+            "Resumed from {} already-exported function(s).",
+            report.resumed_from
+        );
     }
     if !args.no_manifest {
-        println!(
-            "Manifest: {}",
-            manifest_path(&args.output).display()
-        );
+        println!("Manifest: {}", manifest_path(&args.output).display());
     }
     if verbose {
         let ratio = if report.uncompressed_bytes == 0 {

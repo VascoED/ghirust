@@ -49,6 +49,27 @@ enum Command {
     /// Identify the format, architecture and language of a binary.
     Inspect(commands::inspect::InspectArgs),
 
+    /// Disassemble, discover functions and reconstruct pseudocode.
+    Analyze(commands::analyze::AnalyzeArgs),
+
+    /// List recovered functions.
+    Functions(commands::analyze::FunctionsArgs),
+
+    /// Show the machine-code listing for recovered functions.
+    Disasm(commands::analyze::DisasmArgs),
+
+    /// Show reconstructed pseudocode.
+    Decompile(commands::analyze::DecompileArgs),
+
+    /// List cross-references between code and data.
+    Xrefs(commands::analyze::XrefsArgs),
+
+    /// Create, import, analyze and annotate persistent projects.
+    Project(commands::project::ProjectArgs),
+
+    /// Measure real analysis time and recovery counts for a binary.
+    Benchmark(commands::benchmark::BenchmarkArgs),
+
     /// Extract printable ASCII and UTF-16 strings from a binary.
     Strings(commands::strings::StringsArgs),
 
@@ -118,7 +139,9 @@ fn main() -> ExitCode {
                 for cause in error.chain().skip(1) {
                     eprintln!("  caused by: {cause}");
                 }
-                eprintln!("hint: run `ghirust doctor` for a setup check, or `ghirust start` for guided help.");
+                eprintln!(
+                    "hint: run `ghirust doctor` for a setup check, or `ghirust start` for guided help."
+                );
             }
             ExitCode::FAILURE
         }
@@ -132,12 +155,23 @@ fn run(cli: Cli) -> anyhow::Result<()> {
     match cli.command {
         Command::Start => commands::start::run(verbose)?,
         Command::Inspect(args) => commands::inspect::run(&args, json)?,
+        Command::Analyze(args) => commands::analyze::run_analyze(&args, json)?,
+        Command::Functions(args) => commands::analyze::run_functions(&args, json)?,
+        Command::Disasm(args) => commands::analyze::run_disasm(&args, json)?,
+        Command::Decompile(args) => commands::analyze::run_decompile(&args, json)?,
+        Command::Xrefs(args) => commands::analyze::run_xrefs(&args, json)?,
+        Command::Project(args) => commands::project::run(&args, json)?,
+        Command::Benchmark(args) => commands::benchmark::run(&args, json)?,
         Command::Strings(args) => commands::strings::run(&args, json)?,
         Command::Ir(args) => commands::ir::run(&args, json)?,
         Command::Search(args) => commands::search::run(&args, json, verbose)?,
-        Command::Index(args) => {
-            commands::index::run(&args.root, args.index, args.force, args.include_hidden, json)?
-        }
+        Command::Index(args) => commands::index::run(
+            &args.root,
+            args.index,
+            args.force,
+            args.include_hidden,
+            json,
+        )?,
         Command::Export(args) => commands::export::run(&args, json, verbose)?,
         Command::Doctor(args) => commands::doctor::run(&args.root, json)?,
         Command::Explain(args) => commands::explain::run(args.topic.as_deref(), json)?,

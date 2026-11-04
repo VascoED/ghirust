@@ -62,7 +62,10 @@ pub fn run(args: &InspectArgs, json: bool) -> Result<()> {
     }
     match (&report.language, report.language_confidence) {
         (Some(language), confidence) if confidence > 0.0 => {
-            println!("Likely language: {language} (confidence {:.0}%)", confidence * 100.0);
+            println!(
+                "Likely language: {language} (confidence {:.0}%)",
+                confidence * 100.0
+            );
         }
         _ => println!("Likely language: not identified"),
     }

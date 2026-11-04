@@ -1,0 +1,307 @@
+﻿{
+    "generated_at":  "2026-11-04T17:05:52+00:00",
+    "total":  50,
+    "passed":  50,
+    "checks":  [
+                   {
+                       "check":  "features_add(3,4)",
+                       "expected":  7,
+                       "actual":  7,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "features_sub(10,4)",
+                       "expected":  6,
+                       "actual":  6,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "features_mul(6,7)",
+                       "expected":  42,
+                       "actual":  42,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "features_div(9,2)",
+                       "expected":  4,
+                       "actual":  4,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "features_div(9,0)",
+                       "expected":  0,
+                       "actual":  0,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "features_many_args(1..6)",
+                       "expected":  91,
+                       "actual":  91,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "features_classify(-5)",
+                       "expected":  0,
+                       "actual":  0,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "features_classify(0)",
+                       "expected":  1,
+                       "actual":  1,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "features_classify(50)",
+                       "expected":  2,
+                       "actual":  2,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "features_classify(500)",
+                       "expected":  3,
+                       "actual":  3,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "features_sum_loop(10)",
+                       "expected":  55,
+                       "actual":  55,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "features_for_loop(6)",
+                       "expected":  12,
+                       "actual":  12,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "features_fib(10)",
+                       "expected":  55,
+                       "actual":  55,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "features_array_sum(1..5)",
+                       "expected":  15,
+                       "actual":  15,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "features_reverse_in_place(abcd)",
+                       "expected":  "dcba",
+                       "actual":  "dcba",
+                       "passed":  true
+                   },
+                   {
+                       "check":  "features_struct_area(6x7)",
+                       "expected":  42,
+                       "actual":  42,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "features_pointer_swap(3,9) a",
+                       "expected":  9,
+                       "actual":  9,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "features_pointer_swap(3,9) b",
+                       "expected":  3,
+                       "actual":  3,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "features_tagged_area(circle 6,7)",
+                       "expected":  42,
+                       "actual":  42,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "features_tagged_area(rect 6,7)",
+                       "expected":  6,
+                       "actual":  6,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "features_tagged_area(other 6,7)",
+                       "expected":  1,
+                       "actual":  1,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "features_string_length(hello)",
+                       "expected":  5,
+                       "actual":  5,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "features_call_internal(21)",
+                       "expected":  43,
+                       "actual":  43,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "features_counter_run(5)",
+                       "expected":  7,
+                       "actual":  7,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "features_export_marker()",
+                       "expected":  65195,
+                       "actual":  65195,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "cpp_add(3,4)",
+                       "expected":  7,
+                       "actual":  7,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "cpp_sub(10,4)",
+                       "expected":  6,
+                       "actual":  6,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "cpp_mul(6,7)",
+                       "expected":  42,
+                       "actual":  42,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "cpp_div(9,2)",
+                       "expected":  4,
+                       "actual":  4,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "cpp_div(9,0)",
+                       "expected":  0,
+                       "actual":  0,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "cpp_classify(-5)",
+                       "expected":  0,
+                       "actual":  0,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "cpp_classify(0)",
+                       "expected":  1,
+                       "actual":  1,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "cpp_classify(50)",
+                       "expected":  2,
+                       "actual":  2,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "cpp_classify(500)",
+                       "expected":  3,
+                       "actual":  3,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "cpp_sum_loop(10)",
+                       "expected":  55,
+                       "actual":  55,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "cpp_even_loop(6)",
+                       "expected":  12,
+                       "actual":  12,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "cpp_fact(5)",
+                       "expected":  120,
+                       "actual":  120,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "cpp_struct_area(6x7)",
+                       "expected":  42,
+                       "actual":  42,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "cpp_array_sum(1..5)",
+                       "expected":  15,
+                       "actual":  15,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "cpp_counter_run(5)",
+                       "expected":  7,
+                       "actual":  7,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "cpp_virtual_dispatch(derived)",
+                       "expected":  42,
+                       "actual":  42,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "cpp_virtual_dispatch(base)",
+                       "expected":  10,
+                       "actual":  10,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "cpp_overload_int(5)",
+                       "expected":  15,
+                       "actual":  15,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "cpp_overload_double(2.5)",
+                       "expected":  7.5,
+                       "actual":  7.5,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "cpp_method_call(3)",
+                       "expected":  21,
+                       "actual":  21,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "cpp_exception_safe(10)",
+                       "expected":  10,
+                       "actual":  10,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "cpp_exception_safe(0)",
+                       "expected":  "-1",
+                       "actual":  -1,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "cpp_calls_rust(3,4)",
+                       "expected":  8,
+                       "actual":  8,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "bridge_roundtrip(3,4)",
+                       "expected":  16,
+                       "actual":  16,
+                       "passed":  true
+                   },
+                   {
+                       "check":  "bridge_direct(3,4)",
+                       "expected":  7,
+                       "actual":  7,
+                       "passed":  true
+                   }
+               ]
+}

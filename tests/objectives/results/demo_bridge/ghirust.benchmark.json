@@ -1,0 +1,71 @@
+{
+  "core_analysis_ms": {
+    "max": 10,
+    "mean": 9.0,
+    "median": 10,
+    "min": 7
+  },
+  "decompile": true,
+  "file": "./tests\\objectives\\binaries\\demo_bridge.dll",
+  "file_bytes": 9216,
+  "runs": 3,
+  "samples": [
+    {
+      "analysis_ms": 10,
+      "blocks": 206,
+      "functions": 52,
+      "instructions": 840,
+      "wall_ms": 12,
+      "xrefs": 568
+    },
+    {
+      "analysis_ms": 7,
+      "blocks": 206,
+      "functions": 52,
+      "instructions": 840,
+      "wall_ms": 9,
+      "xrefs": 568
+    },
+    {
+      "analysis_ms": 10,
+      "blocks": 206,
+      "functions": 52,
+      "instructions": 840,
+      "wall_ms": 12,
+      "xrefs": 568
+    }
+  ],
+  "sha256": "17491795c347b57bdbfd4cb007a09cfd3a0ccdec27bf9bd5d076edb2ee3fba99",
+  "stats": {
+    "blocks": 206,
+    "elapsed_ms": 10,
+    "functions": 52,
+    "functions_from_calls": 0,
+    "instructions": 840,
+    "linear_scan_instructions": 1256,
+    "overlapping_functions_skipped": 68,
+    "seeds": 120,
+    "truncated": false,
+    "xrefs": 568
+  },
+  "wall_ms": {
+    "max": 12,
+    "mean": 11.0,
+    "median": 12,
+    "min": 9
+  },
+  "warnings": [
+    "linear sweep decoded 1256 instruction(s) across 1 executable section(s)",
+    "FUN_180001090: instruction 'int3' at 0x180001194 has no semantic model",
+    "FUN_1800011a0: instruction 'int3' at 0x180001239 has no semantic model",
+    "FUN_180001420: instruction 'cmpxchg' at 0x18000143c has no semantic model",
+    "FUN_1800014b0: instruction 'movdqa' at 0x1800014ed has no semantic model",
+    "FUN_1800014b0: instruction 'movdqu' at 0x1800014f5 has no semantic model",
+    "FUN_180001710: instruction 'xchg' at 0x180001728 has no semantic model",
+    "FUN_1800018d0: instruction 'int' at 0x1800018d2 has no semantic model",
+    "FUN_180001990: instruction 'bt' at 0x180001a53 has no semantic model",
+    "FUN_180001990: instruction 'btr' at 0x180001bb7 has no semantic model",
+    "FUN_180001990: instruction 'cpuid' at 0x1800019a2 has no semantic model",
+    "FUN_180001990: instruction 'xgetbv' at 0x180001afe has no semantic model"
+  ]
+}

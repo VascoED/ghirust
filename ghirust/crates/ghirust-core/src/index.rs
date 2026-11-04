@@ -105,8 +105,7 @@ impl SearchIndex {
     /// Find the function containing `offset` in `file_id`.
     pub fn enclosing_function(&self, file_id: u32, offset: u64) -> Option<&FunctionEntry> {
         let end = self.functions.partition_point(|function| {
-            function.file_id < file_id
-                || (function.file_id == file_id && function.offset <= offset)
+            function.file_id < file_id || (function.file_id == file_id && function.offset <= offset)
         });
         if end == 0 {
             return None;
@@ -164,6 +163,8 @@ pub struct IndexReport {
     pub cache_hits: u64,
     /// Per-file scan results recomputed because the cache missed.
     pub cache_misses: u64,
+    /// Recoverable cache errors encountered while building the index.
+    pub cache_warnings: Vec<String>,
     /// Wall-clock duration.
     pub elapsed_ms: u128,
 }
@@ -213,36 +214,49 @@ pub fn build_index(options: &IndexOptions) -> Result<IndexReport> {
     let mut files_with_markers = HashSet::new();
     let mut cache_hits = 0u64;
     let mut cache_misses = 0u64;
-    let mut cache = Cache::open(
-        root.join(".ghirust").join("cache"),
-        256 * 1024 * 1024,
-    )
-    .ok();
+    let mut cache_warnings = Vec::new();
+    let mut cache = match Cache::open(root.join(".ghirust").join("cache"), 256 * 1024 * 1024) {
+        Ok(cache) => Some(cache),
+        Err(error) => {
+            cache_warnings.push(format!("scan cache unavailable: {error}"));
+            None
+        }
+    };
 
     for (id, path) in paths.iter().enumerate() {
         let file_id = id as u32;
-        let is_manifest = path.file_name().and_then(|value| value.to_str()) == Some("manifest.ndjson");
+        let is_manifest =
+            path.file_name().and_then(|value| value.to_str()) == Some("manifest.ndjson");
         let mut used_cache = false;
 
         if !is_manifest {
             if let Some(cache) = cache.as_mut() {
-                if let Ok(hash) = hash_file(path) {
-                    let key = format!("scan-v1-{hash}");
-                    match cache.get_json::<CachedScan>(&key) {
-                        Ok(Some(mut cached)) => {
-                            for function in &mut cached.functions {
-                                function.file_id = file_id;
+                match hash_file(path) {
+                    Ok(hash) => {
+                        let key = format!("scan-v1-{hash}");
+                        match cache.get_json::<CachedScan>(&key) {
+                            Ok(Some(mut cached)) => {
+                                for function in &mut cached.functions {
+                                    function.file_id = file_id;
+                                }
+                                if !cached.functions.is_empty() {
+                                    files_with_markers.insert(file_id);
+                                }
+                                functions.append(&mut cached.functions);
+                                cache_hits += 1;
+                                used_cache = true;
                             }
-                            if !cached.functions.is_empty() {
-                                files_with_markers.insert(file_id);
-                            }
-                            functions.append(&mut cached.functions);
-                            cache_hits += 1;
-                            used_cache = true;
+                            Ok(None) => {}
+                            Err(error) => cache_warnings.push(format!(
+                                "failed reading scan cache for {}: {error}",
+                                path.display()
+                            )),
                         }
-                        Ok(None) => {}
-                        Err(_) => {}
                     }
+                    Err(error) => cache_warnings.push(format!(
+                        "failed hashing {} for scan cache: {error}",
+                        path.display()
+                    )),
                 }
             }
         }
@@ -257,14 +271,25 @@ pub fn build_index(options: &IndexOptions) -> Result<IndexReport> {
         }
         if !is_manifest {
             if let Some(cache) = cache.as_mut() {
-                if let Ok(hash) = hash_file(path) {
-                    let key = format!("scan-v1-{hash}");
-                    let _ = cache.put_json(
-                        &key,
-                        &CachedScan {
-                            functions: markers.clone(),
-                        },
-                    );
+                match hash_file(path) {
+                    Ok(hash) => {
+                        let key = format!("scan-v1-{hash}");
+                        if let Err(error) = cache.put_json(
+                            &key,
+                            &CachedScan {
+                                functions: markers.clone(),
+                            },
+                        ) {
+                            cache_warnings.push(format!(
+                                "failed storing scan cache for {}: {error}",
+                                path.display()
+                            ));
+                        }
+                    }
+                    Err(error) => cache_warnings.push(format!(
+                        "failed hashing {} for scan cache: {error}",
+                        path.display()
+                    )),
                 }
             }
             cache_misses += 1;
@@ -273,7 +298,10 @@ pub fn build_index(options: &IndexOptions) -> Result<IndexReport> {
         pending_manifest.append(&mut manifest_entries);
     }
     if let Some(cache) = cache.as_mut() {
-        let _ = cache.flush();
+        if let Err(error) = cache.flush() {
+            cache_warnings.push(format!("failed flushing scan cache: {error}"));
+        }
+        cache_warnings.extend(cache.take_diagnostics());
     }
     drop(cache);
 
@@ -336,6 +364,7 @@ pub fn build_index(options: &IndexOptions) -> Result<IndexReport> {
         bytes_scanned,
         cache_hits,
         cache_misses,
+        cache_warnings,
         elapsed_ms: started.elapsed().as_millis(),
     };
     Ok(report)
@@ -379,11 +408,7 @@ pub fn load_index(path: &Path) -> Result<SearchIndex> {
 /// Load an index when it is fresh, otherwise rebuild it.
 ///
 /// Returns the index and whether it was rebuilt.
-pub fn ensure_index(
-    root: &Path,
-    index_path: &Path,
-    force: bool,
-) -> Result<(SearchIndex, bool)> {
+pub fn ensure_index(root: &Path, index_path: &Path, force: bool) -> Result<(SearchIndex, bool)> {
     if !force && index_path.exists() {
         match load_index(index_path) {
             Ok(index) if !index.is_stale() => return Ok((index, false)),
@@ -450,11 +475,10 @@ fn is_text_file(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-fn scan_file(
-    root: &Path,
-    path: &Path,
-    file_id: u32,
-) -> Result<(Vec<FunctionEntry>, Vec<(PathBuf, ManifestRecord)>, u64)> {
+/// Functions, manifest records and byte count produced by one file scan.
+type ScannedFile = (Vec<FunctionEntry>, Vec<(PathBuf, ManifestRecord)>, u64);
+
+fn scan_file(root: &Path, path: &Path, file_id: u32) -> Result<ScannedFile> {
     let file = File::open(path).at(path)?;
     let mut reader = BufReader::with_capacity(256 * 1024, file);
     let mut line = Vec::new();

@@ -2,6 +2,14 @@ ghira_original_source_code/
 excludedFiles.txt
 ghidra.repos.config
 
+# Local Ghidra source/reference checkout is intentionally not part of this repo.
+# Rust build output
+target/
+**/target/
+
+# Generated objective-test build products (fixture sources/results are kept)
+tests/objectives/build/
+
 # Misc files produced while executing application
 repositories/
 dependencies/
@@ -27,7 +35,6 @@ Thumbs.db
 /bin/
 
 **/dist
-**/target/
 
 # Ignore Sleigh generated files
 *.sla
@@ -91,5 +98,19 @@ core.*
 # python files
 *.egg-info
 __pycache__
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.py[cod]
 
 gradle.lockfile
+
+# Local environment and credentials
+.env
+.env.*
+!.env.example
+
+# Coverage output
+coverage/
+htmlcov/
+lcov.info

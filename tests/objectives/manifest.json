@@ -1,0 +1,112 @@
+{
+  "format_version": 1,
+  "generated_at": "2026-11-04",
+  "fixtures": [
+    {
+      "id": "demo",
+      "binary": "binaries/demo.dll",
+      "source": ["source/demo.rs"],
+      "language": "Rust",
+      "compiler": "rustc 1.98.1 (48a229cea 2026-09-01)",
+      "build": "rustc --edition 2024 -O --crate-type cdylib --crate-name demo demo.rs -o binaries/demo.dll",
+      "architecture": "x86-64",
+      "format": "PE DLL",
+      "sha256": "8e333cc5e9f91a82c675beaf108e8cfccb33e9d5e2c34e8c8fb30705cedd8773",
+      "bytes": 9728,
+      "expected_functions": ["demo_add", "demo_classify", "demo_fact", "demo_max", "demo_mix", "demo_sum_loop"],
+      "behavior_checks": null,
+      "results": {
+        "ghidra": "results/demo/ghidra.ndjson",
+        "ghirust": "results/demo/ghirust.analysis.json",
+        "comparison": "results/demo/comparison.md",
+        "summary": "Ghidra 57 functions, GHIRUST 57, 53 common addresses; 4 only Ghidra (guard thunks), 4 only GHIRUST (shared epilogue fragments)."
+      }
+    },
+    {
+      "id": "demo_features",
+      "binary": "binaries/demo_features.dll",
+      "source": ["source/rust/demo_features.rs"],
+      "language": "Rust",
+      "compiler": "rustc 1.98.1 (48a229cea 2026-09-01)",
+      "build": "rustc --edition 2024 -O --crate-type cdylib -C panic=abort --crate-name demo_features source/rust/demo_features.rs -o binaries/demo_features.dll",
+      "architecture": "x86-64",
+      "format": "PE DLL",
+      "sha256": "36af896e2fbad67aa8485735ffa62a333926db35df607faa2138a74b3336f039",
+      "bytes": 116736,
+      "expected_functions": [
+        "features_add", "features_sub", "features_mul", "features_div",
+        "features_many_args", "features_classify", "features_sum_loop",
+        "features_for_loop", "features_fib", "features_array_sum",
+        "features_reverse_in_place", "features_struct_area",
+        "features_struct_by_value", "features_tagged_area",
+        "features_pointer_swap", "features_memzero", "features_string_length",
+        "features_float_loop", "features_call_internal", "features_counter_run",
+        "features_export_marker"
+      ],
+      "behavior_checks": "results/behavior.json (features_* checks)",
+      "results": {
+        "ghidra": "results/demo_features/ghidra.ndjson",
+        "ghirust": "results/demo_features/ghirust.analysis.json",
+        "comparison": "results/demo_features/comparison.md",
+        "summary": "Ghidra 385 functions, GHIRUST 468, 327 common addresses. GHIRUST's jump-target seeds add epilogue fragments; the exported functions are recovered by name."
+      }
+    },
+    {
+      "id": "demo_cpp",
+      "binary": "binaries/demo_cpp.dll",
+      "source": ["source/cpp/demo_cpp.cpp"],
+      "language": "C++",
+      "compiler": "Microsoft (R) C/C++ Optimizing Compiler 19.51.36260 (MSVC 14.51)",
+      "build": "cl /nologo /LD /O2 /EHsc /std:c++20 source/cpp/demo_cpp.cpp /link /OUT:binaries/demo_cpp.dll binaries/demo_features.dll.lib",
+      "architecture": "x86-64",
+      "format": "PE DLL",
+      "sha256": "ea8badac1ce99feca022c85c2434d0305e2d36572827a0541838c1a6f9ac8afe",
+      "bytes": 119808,
+      "expected_functions": [
+        "cpp_add", "cpp_sub", "cpp_mul", "cpp_div", "cpp_classify",
+        "cpp_sum_loop", "cpp_even_loop", "cpp_fact", "cpp_struct_area",
+        "cpp_array_sum", "cpp_pointer_swap", "cpp_memzero",
+        "cpp_counter_run", "cpp_virtual_dispatch", "cpp_overload_int",
+        "cpp_overload_double", "cpp_method_call", "cpp_exception_safe",
+        "cpp_calls_rust", "cpp_scale (mangled overloads)"
+      ],
+      "behavior_checks": "results/behavior.json (cpp_* checks)",
+      "results": {
+        "ghidra": "results/demo_cpp/ghidra.ndjson",
+        "ghirust": "results/demo_cpp/ghirust.analysis.json",
+        "comparison": "results/demo_cpp/comparison.md",
+        "summary": "Ghidra 444 functions, GHIRUST 461, 401 common addresses. Ghidra demangles C++ names (Microsoft demangler); GHIRUST reports raw export names."
+      }
+    },
+    {
+      "id": "demo_bridge",
+      "binary": "binaries/demo_bridge.dll",
+      "source": ["source/rust/demo_bridge.rs", "source/cpp/demo_cpp.cpp", "source/rust/demo_features.rs"],
+      "language": "Rust (imports demo_cpp.dll which imports demo_features.dll)",
+      "compiler": "rustc 1.98.1 (48a229cea 2026-09-01)",
+      "build": "rustc --edition 2024 -O --crate-type cdylib -C panic=abort --crate-name demo_bridge source/rust/demo_bridge.rs -L binaries -o binaries/demo_bridge.dll",
+      "architecture": "x86-64",
+      "format": "PE DLL",
+      "sha256": "17491795c347b57bdbfd4cb007a09cfd3a0ccdec27bf9bd5d076edb2ee3fba99",
+      "bytes": 9216,
+      "expected_functions": ["bridge_roundtrip", "bridge_direct"],
+      "behavior_checks": "results/behavior.json (bridge_* checks)",
+      "results": {
+        "ghidra": "results/demo_bridge/ghidra.ndjson",
+        "ghirust": "results/demo_bridge/ghirust.analysis.json",
+        "comparison": "results/demo_bridge/comparison.md",
+        "summary": "Ghidra 55 functions, GHIRUST 52, 49 common addresses. Round-trip Rust -> C++ -> Rust call chain analyzed by both."
+      }
+    }
+  ],
+  "behavior": {
+    "harness": "run_behavior.ps1",
+    "report": "results/behavior.json",
+    "result": "50/50 checks passed"
+  },
+  "comparison_tool": "tools/compare.py",
+  "notes": "binaries/ also holds build artifacts needed for interop linking (demo_features.dll.lib, demo_cpp.lib, *.exp, demo_features.pdb). Regenerate with build_fixtures.ps1; do not commit modified artifacts without re-running the behavior harness and the comparisons.",
+  "ghidra_version": "12.2 PUBLIC (20261016)",
+  "java_version": "25.0.4.1 LTS",
+  "ghirust_version": "0.1.0"
+}

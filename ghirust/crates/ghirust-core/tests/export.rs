@@ -1,8 +1,8 @@
 use std::fs;
-use std::io::Read;
+use std::io::{BufWriter, Read, Write};
 
 use flate2::read::GzDecoder;
-use ghirust_core::export::{Compression, ExportOptions, export_input};
+use ghirust_core::export::{Compression, ExportOptions, export_input, export_input_fingerprint};
 use ghirust_core::model::FunctionRecord;
 use tempfile::tempdir;
 
@@ -147,12 +147,21 @@ fn resumes_from_a_checkpoint() {
         third_header
     };
     let prefix = &full_text[..cut];
+    let fingerprint = export_input_fingerprint(
+        &input,
+        &ExportOptions {
+            output: resumed.clone(),
+            ..ExportOptions::default()
+        },
+    )
+    .unwrap();
     fs::write(temp.path().join("resumed.c.part"), prefix).unwrap();
     fs::write(
         temp.path().join("resumed.c.checkpoint.json"),
         serde_json::to_vec(&serde_json::json!({
             "records": 2,
             "output_bytes": prefix.len(),
+            "input_fingerprint": fingerprint,
         }))
         .unwrap(),
     )
@@ -176,8 +185,107 @@ fn resumes_from_a_checkpoint() {
     assert_eq!(report.resumed_from, 2);
     assert_eq!(report.records, 4);
     assert_eq!(fs::read_to_string(&resumed).unwrap(), full_text);
-    let resumed_manifest = fs::read_to_string(temp.path().join("resumed.c.manifest.ndjson")).unwrap();
+    let resumed_manifest =
+        fs::read_to_string(temp.path().join("resumed.c.manifest.ndjson")).unwrap();
     assert_eq!(resumed_manifest.lines().count(), 4);
+}
+
+#[test]
+fn refuses_to_resume_when_the_input_changes() {
+    let temp = tempdir().unwrap();
+    let input = temp.path().join("functions.ndjson");
+    let output = temp.path().join("resumed.c");
+    write_ndjson(&input, &[record("first", "0x1", "int first() {}\n")]);
+
+    let fingerprint = export_input_fingerprint(&input, &ExportOptions::default()).unwrap();
+    let partial = temp.path().join("resumed.c.part");
+    fs::write(&partial, b"preserve partial export").unwrap();
+    fs::write(
+        temp.path().join("resumed.c.checkpoint.json"),
+        serde_json::to_vec(&serde_json::json!({
+            "records": 1,
+            "output_bytes": 23,
+            "input_fingerprint": fingerprint,
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    write_ndjson(&input, &[record("changed", "0x2", "int changed() {}\n")]);
+
+    let error = export_input(
+        &input,
+        &ExportOptions {
+            output,
+            resume: true,
+            ..ExportOptions::default()
+        },
+    )
+    .unwrap_err();
+
+    assert!(
+        error
+            .to_string()
+            .contains("input or export options changed")
+    );
+    assert_eq!(fs::read(partial).unwrap(), b"preserve partial export");
+}
+
+#[test]
+fn export_fingerprint_includes_output_configuration() {
+    let temp = tempdir().unwrap();
+    let input = temp.path().join("functions.ndjson");
+    write_ndjson(&input, &[record("first", "0x1", "int first() {}\n")]);
+
+    let default_fingerprint = export_input_fingerprint(&input, &ExportOptions::default()).unwrap();
+    let no_manifest_fingerprint = export_input_fingerprint(
+        &input,
+        &ExportOptions {
+            write_manifest: false,
+            ..ExportOptions::default()
+        },
+    )
+    .unwrap();
+
+    assert_ne!(default_fingerprint, no_manifest_fingerprint);
+}
+
+#[test]
+fn refuses_to_resume_past_the_end_of_the_input() {
+    let temp = tempdir().unwrap();
+    let input = temp.path().join("functions.ndjson");
+    let output = temp.path().join("resumed.c");
+    write_ndjson(&input, &[record("first", "0x1", "int first() {}\n")]);
+
+    let options = ExportOptions {
+        output: output.clone(),
+        write_manifest: false,
+        ..ExportOptions::default()
+    };
+    let fingerprint = export_input_fingerprint(&input, &options).unwrap();
+    let partial = temp.path().join("resumed.c.part");
+    fs::write(&partial, b"part").unwrap();
+    fs::write(
+        temp.path().join("resumed.c.checkpoint.json"),
+        serde_json::to_vec(&serde_json::json!({
+            "records": 2,
+            "output_bytes": 4,
+            "input_fingerprint": fingerprint,
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+
+    let error = export_input(
+        &input,
+        &ExportOptions {
+            resume: true,
+            ..options
+        },
+    )
+    .unwrap_err();
+
+    assert!(error.to_string().contains("input has only 1"));
+    assert_eq!(fs::read(partial).unwrap(), b"part");
 }
 
 #[test]
@@ -212,6 +320,99 @@ fn exports_a_directory_using_its_manifest() {
     let second = text.find("// Function: second @ 0x2").unwrap();
     assert!(first < second);
     assert!(text.contains("int first(void)"));
+}
+
+#[test]
+fn exports_large_directory_manifest_incrementally() {
+    let temp = tempdir().unwrap();
+    let input = temp.path().join("ghidra-export");
+    fs::create_dir_all(&input).unwrap();
+    let mut manifest = BufWriter::new(fs::File::create(input.join("manifest.ndjson")).unwrap());
+    const FUNCTIONS: usize = 2_000;
+
+    for index in 0..FUNCTIONS {
+        let file_name = format!("{index:06}.c");
+        fs::write(input.join(&file_name), format!("int f{index}() {{}}\n")).unwrap();
+        writeln!(
+            manifest,
+            "{}",
+            serde_json::json!({
+                "name": format!("f{index}"),
+                "address": format!("0x{index:x}"),
+                "file": file_name,
+            })
+        )
+        .unwrap();
+    }
+    manifest.flush().unwrap();
+
+    let output = temp.path().join("out.c");
+    let report = export_input(
+        &input,
+        &ExportOptions {
+            output: output.clone(),
+            ..ExportOptions::default()
+        },
+    )
+    .unwrap();
+
+    assert_eq!(report.records, FUNCTIONS as u64);
+    assert_eq!(
+        fs::read_to_string(temp.path().join("out.c.manifest.ndjson"))
+            .unwrap()
+            .lines()
+            .count(),
+        FUNCTIONS
+    );
+    assert!(
+        fs::read_to_string(output)
+            .unwrap()
+            .contains("// Function: f1999 @ 0x7cf")
+    );
+}
+
+#[test]
+#[ignore = "writes and verifies more than 100 MiB; run explicitly for streaming validation"]
+fn exports_more_than_one_hundred_megabytes_from_ndjson() {
+    use std::io::{BufRead, BufReader};
+
+    let temp = tempdir().unwrap();
+    let input = temp.path().join("large-functions.ndjson");
+    let output = temp.path().join("large-output.c");
+    const FUNCTIONS: usize = 1_024;
+    const BODY_BYTES: usize = 128 * 1024;
+    let body = "x".repeat(BODY_BYTES);
+
+    {
+        let mut writer = BufWriter::new(fs::File::create(&input).unwrap());
+        for index in 0..FUNCTIONS {
+            let function = record(&format!("function_{index}"), &format!("0x{index:x}"), &body);
+            serde_json::to_writer(&mut writer, &function).unwrap();
+            writer.write_all(b"\n").unwrap();
+        }
+        writer.flush().unwrap();
+    }
+
+    let report = export_input(
+        &input,
+        &ExportOptions {
+            output: output.clone(),
+            ..ExportOptions::default()
+        },
+    )
+    .unwrap();
+    let output_bytes = fs::metadata(&output).unwrap().len();
+    assert_eq!(report.records, FUNCTIONS as u64);
+    assert!(output_bytes > 100 * 1024 * 1024);
+    assert_eq!(report.written_bytes, output_bytes);
+    assert_eq!(ghirust_core::cache::hash_file(&output).unwrap().len(), 64);
+
+    let manifest = fs::File::open(temp.path().join("large-output.c.manifest.ndjson")).unwrap();
+    assert_eq!(BufReader::new(manifest).lines().count(), FUNCTIONS);
+    eprintln!(
+        "streamed {} functions into {} bytes in {} ms",
+        report.records, output_bytes, report.elapsed_ms
+    );
 }
 
 #[test]

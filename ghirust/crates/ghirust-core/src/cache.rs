@@ -60,6 +60,7 @@ pub struct Cache {
     dirty: bool,
     hits: u64,
     misses: u64,
+    diagnostics: Vec<String>,
 }
 
 impl Cache {
@@ -68,27 +69,49 @@ impl Cache {
         let root = root.into();
         fs::create_dir_all(&root).at(&root)?;
         let manifest_path = root.join("index.json");
-        let manifest = if manifest_path.exists() {
-            match fs::read(&manifest_path) {
-                Ok(bytes) => match serde_json::from_slice::<CacheManifest>(&bytes) {
-                    Ok(manifest) if manifest.version == CACHE_VERSION => manifest,
-                    _ => CacheManifest {
+        let mut diagnostics = Vec::new();
+        let manifest = match fs::read(&manifest_path) {
+            Ok(bytes) => match serde_json::from_slice::<CacheManifest>(&bytes) {
+                Ok(manifest) if manifest.version == CACHE_VERSION => manifest,
+                Ok(manifest) => {
+                    diagnostics.push(format!(
+                        "ignoring cache manifest {} with unsupported version {}",
+                        manifest_path.display(),
+                        manifest.version
+                    ));
+                    CacheManifest {
                         version: CACHE_VERSION,
                         max_bytes,
                         entries: BTreeMap::new(),
-                    },
-                },
-                Err(_) => CacheManifest {
-                    version: CACHE_VERSION,
-                    max_bytes,
-                    entries: BTreeMap::new(),
-                },
-            }
-        } else {
-            CacheManifest {
+                    }
+                }
+                Err(error) => {
+                    diagnostics.push(format!(
+                        "ignoring invalid cache manifest {}: {error}",
+                        manifest_path.display()
+                    ));
+                    CacheManifest {
+                        version: CACHE_VERSION,
+                        max_bytes,
+                        entries: BTreeMap::new(),
+                    }
+                }
+            },
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => CacheManifest {
                 version: CACHE_VERSION,
                 max_bytes,
                 entries: BTreeMap::new(),
+            },
+            Err(error) => {
+                diagnostics.push(format!(
+                    "ignoring unreadable cache manifest {}: {error}",
+                    manifest_path.display()
+                ));
+                CacheManifest {
+                    version: CACHE_VERSION,
+                    max_bytes,
+                    entries: BTreeMap::new(),
+                }
             }
         };
 
@@ -99,6 +122,7 @@ impl Cache {
             dirty: false,
             hits: 0,
             misses: 0,
+            diagnostics,
         };
         cache.manifest.max_bytes = max_bytes;
         Ok(cache)
@@ -114,21 +138,33 @@ impl Cache {
         let path = self.value_path(key);
         match fs::read(&path) {
             Ok(bytes) => {
+                if bytes.len() as u64 != entry.size {
+                    self.manifest.entries.remove(key);
+                    self.diagnostics.push(format!(
+                        "discarding truncated cache value {} (expected {} bytes, found {})",
+                        path.display(),
+                        entry.size,
+                        bytes.len()
+                    ));
+                    self.misses += 1;
+                    self.dirty = true;
+                    return Ok(None);
+                }
                 self.hits += 1;
                 if let Some(entry) = self.manifest.entries.get_mut(key) {
                     entry.last_used_unix = now_unix();
                 }
                 self.dirty = true;
-                if bytes.len() as u64 != entry.size {
-                    self.manifest.entries.remove(key);
-                    return Ok(None);
-                }
                 Ok(Some(bytes))
             }
-            Err(_) => {
+            Err(error) => {
                 self.misses += 1;
                 self.manifest.entries.remove(key);
                 self.dirty = true;
+                self.diagnostics.push(format!(
+                    "discarding unreadable cache value {}: {error}",
+                    path.display()
+                ));
                 Ok(None)
             }
         }
@@ -141,9 +177,12 @@ impl Cache {
         };
         match serde_json::from_slice(&bytes) {
             Ok(value) => Ok(Some(value)),
-            Err(_) => {
+            Err(error) => {
                 self.manifest.entries.remove(key);
                 self.dirty = true;
+                self.diagnostics.push(format!(
+                    "discarding invalid JSON cache value for key {key}: {error}"
+                ));
                 Ok(None)
             }
         }
@@ -164,8 +203,7 @@ impl Cache {
             },
         );
         self.dirty = true;
-        self.evict_if_needed();
-        Ok(())
+        self.evict_if_needed()
     }
 
     /// Encode and store a JSON value.
@@ -217,19 +255,19 @@ impl Cache {
         CacheStats {
             root: self.root.clone(),
             entries: self.manifest.entries.len() as u64,
-            total_bytes: self
-                .manifest
-                .entries
-                .values()
-                .map(|entry| entry.size)
-                .sum(),
+            total_bytes: self.manifest.entries.values().map(|entry| entry.size).sum(),
             max_bytes: self.manifest.max_bytes,
             hits: self.hits,
             misses: self.misses,
         }
     }
 
-    fn evict_if_needed(&mut self) {
+    /// Return and clear recoverable cache diagnostics.
+    pub fn take_diagnostics(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.diagnostics)
+    }
+
+    fn evict_if_needed(&mut self) -> Result<()> {
         while self.total_bytes() > self.manifest.max_bytes && !self.manifest.entries.is_empty() {
             let oldest = self
                 .manifest
@@ -240,19 +278,20 @@ impl Cache {
             let Some(oldest) = oldest else {
                 break;
             };
-            self.manifest.entries.remove(&oldest);
             let path = self.value_path(&oldest);
-            let _ = fs::remove_file(path);
+            match fs::remove_file(&path) {
+                Ok(()) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(GhirustError::io(&path, error)),
+            }
+            self.manifest.entries.remove(&oldest);
             self.dirty = true;
         }
+        Ok(())
     }
 
     fn total_bytes(&self) -> u64 {
-        self.manifest
-            .entries
-            .values()
-            .map(|entry| entry.size)
-            .sum()
+        self.manifest.entries.values().map(|entry| entry.size).sum()
     }
 
     fn value_path(&self, key: &str) -> PathBuf {
@@ -271,9 +310,7 @@ pub fn validate_key(key: &str) -> Result<()> {
         .bytes()
         .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
     {
-        return Err(GhirustError::message(format!(
-            "invalid cache key: {key}"
-        )));
+        return Err(GhirustError::message(format!("invalid cache key: {key}")));
     }
     if key == "." || key == ".." {
         return Err(GhirustError::message("invalid cache key"));
@@ -351,6 +388,26 @@ mod tests {
         let mut reopened = Cache::open(temp.path(), 1024 * 1024).unwrap();
         assert_eq!(reopened.get("key-one").unwrap(), Some(b"hello".to_vec()));
         assert_eq!(reopened.stats().hits, 1);
+    }
+
+    #[test]
+    fn truncated_values_are_reported_as_misses() {
+        let temp = tempdir().unwrap();
+        let mut cache = Cache::open(temp.path(), 1024 * 1024).unwrap();
+        cache.put("key-one", b"hello").unwrap();
+        cache.flush().unwrap();
+        fs::write(temp.path().join("key-one.bin"), b"x").unwrap();
+
+        let mut reopened = Cache::open(temp.path(), 1024 * 1024).unwrap();
+        assert_eq!(reopened.get("key-one").unwrap(), None);
+        assert_eq!(reopened.stats().hits, 0);
+        assert_eq!(reopened.stats().misses, 1);
+        assert!(
+            reopened
+                .take_diagnostics()
+                .iter()
+                .any(|warning| warning.contains("truncated cache value"))
+        );
     }
 
     #[test]

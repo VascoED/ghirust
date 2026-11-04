@@ -51,11 +51,15 @@ pub enum GhirustError {
     },
 
     /// Resuming is only supported for uncompressed output.
-    #[error("--resume is not supported for gzip output; write a plain file and compress it afterwards")]
+    #[error(
+        "--resume is not supported for gzip output; write a plain file and compress it afterwards"
+    )]
     ResumeGzip,
 
     /// A checkpoint points outside the partial output file.
-    #[error("checkpoint is inconsistent with {path}: expected at most {actual} bytes, found {expected}")]
+    #[error(
+        "checkpoint is inconsistent with {path}: expected at most {actual} bytes, found {expected}"
+    )]
     CorruptCheckpoint {
         /// Partial output path.
         path: PathBuf,
@@ -66,7 +70,9 @@ pub enum GhirustError {
     },
 
     /// The search index was produced by an incompatible version.
-    #[error("unsupported index version {found}; expected {expected}. Run `ghirust index` to rebuild it")]
+    #[error(
+        "unsupported index version {found}; expected {expected}. Run `ghirust index` to rebuild it"
+    )]
     IndexVersion {
         /// Version found on disk.
         found: u32,

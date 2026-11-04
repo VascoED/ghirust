@@ -5,15 +5,15 @@
 //! * **Symbol search** walks the persisted function index. Tens of thousands
 //!   of names can be filtered in a few milliseconds.
 //! * **Text search** memory-maps each source file and uses SIMD-accelerated
-//!   substring search (`memchr`). Files are processed in parallel with Rayon,
-//!   and each file stops as soon as the per-file result cap is reached.
+//!   substring search (`memchr`). Files are processed in parallel batches
+//!   with Rayon, stopping once the global result cap is known to be exceeded.
 //!
 //! No query ever copies a whole source file into memory, and no query rescans
 //! the Ghidra database.
 
 use std::time::Instant;
 
-use memchr::{memchr2, memchr_iter, memmem, memrchr};
+use memchr::{memchr_iter, memchr2, memmem, memrchr};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -112,8 +112,39 @@ pub struct SearchReport {
     pub elapsed_ms: u128,
 }
 
-/// Execute a search against a previously built index.
+/// Default search parallelism: a bounded fraction of the machine. Searches
+/// never occupy every core by default.
+pub fn search_worker_limit() -> usize {
+    let logical = std::thread::available_parallelism()
+        .map(|value| value.get())
+        .unwrap_or(4);
+    (logical / 2).clamp(1, 4)
+}
+
+/// Execute a search against a previously built index. The parallel text scan
+/// runs on a bounded worker pool (see [`search_worker_limit`]), never on the
+/// global rayon pool with every core.
 pub fn search(index: &SearchIndex, options: &SearchOptions) -> Result<SearchReport> {
+    let workers = search_worker_limit();
+    search_with_workers(index, options, workers)
+}
+
+/// Execute a search with an explicit worker limit (clamped to 1..=64).
+pub fn search_with_workers(
+    index: &SearchIndex,
+    options: &SearchOptions,
+    workers: usize,
+) -> Result<SearchReport> {
+    let workers = workers.clamp(1, 64);
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(workers)
+        .thread_name(|index| format!("ghirust-search-{index}"))
+        .build()
+        .map_err(|error| GhirustError::message(format!("could not build search pool: {error}")))?;
+    pool.install(|| search_in_pool(index, options))
+}
+
+fn search_in_pool(index: &SearchIndex, options: &SearchOptions) -> Result<SearchReport> {
     let started = Instant::now();
     let (query, mode) = resolve_query(options);
     if query.is_empty() {
@@ -269,10 +300,7 @@ fn search_files(
                 file: file.path.clone(),
                 line: function.line,
                 column: 1,
-                text: format!(
-                    "{} · {} function(s)",
-                    file.path, file.functions
-                ),
+                text: format!("{} · {} function(s)", file.path, file.functions),
                 function: Some(function.name.clone()),
                 address: function.address.clone(),
                 score: 50,
@@ -296,7 +324,6 @@ fn search_files(
 struct FileSearch {
     hits: Vec<SearchHit>,
     scanned_bytes: u64,
-    capped: bool,
 }
 
 fn search_text(
@@ -309,54 +336,62 @@ fn search_text(
     let ignore_case = options.ignore_case;
     let snippet_chars = options.snippet_chars.max(32);
 
-    let file_results: Vec<Result<FileSearch>> = index
-        .files
-        .par_iter()
-        .enumerate()
-        .map(|(file_id, file)| {
-            let path = index.root.join(&file.path);
-            let map = ReadOnlyMap::open(&path)?;
-            let bytes = map.bytes();
-            let positions = find_positions(bytes, &needle, ignore_case, limit);
-            let capped = positions.len() >= limit;
-
-            let mut tracker = LineTracker::new();
-            let mut hits = Vec::with_capacity(positions.len());
-            for position in positions {
-                let (line, line_start) = tracker.locate(bytes, position);
-                let line_end = memchr_iter(b'\n', &bytes[position..])
-                    .next()
-                    .map(|offset| position + offset)
-                    .unwrap_or(bytes.len());
-                let snippet = snippet(bytes, line_start, line_end, snippet_chars);
-                let enclosing = index.enclosing_function(file_id as u32, position as u64);
-                hits.push(SearchHit {
-                    file: file.path.clone(),
-                    line,
-                    column: (position.saturating_sub(line_start) + 1) as u64,
-                    text: snippet,
-                    function: enclosing.map(|function| function.name.clone()),
-                    address: enclosing.and_then(|function| function.address.clone()),
-                    score: 0,
-                });
-            }
-
-            Ok(FileSearch {
-                hits,
-                scanned_bytes: bytes.len() as u64,
-                capped,
-            })
-        })
-        .collect();
-
     let mut all_hits = Vec::new();
     let mut scanned_bytes = 0u64;
     let mut truncated = false;
-    for result in file_results {
-        let result = result?;
-        scanned_bytes = scanned_bytes.saturating_add(result.scanned_bytes);
-        truncated |= result.capped;
-        all_hits.extend(result.hits);
+    let mut file_order: Vec<usize> = (0..index.files.len()).collect();
+    file_order.sort_by(|left, right| index.files[*left].path.cmp(&index.files[*right].path));
+
+    for batch in file_order.chunks(rayon::current_num_threads().max(1)) {
+        let file_limit = limit.saturating_sub(all_hits.len()).saturating_add(1);
+        let file_results: Vec<Result<FileSearch>> = batch
+            .par_iter()
+            .map(|&file_id| {
+                let file = &index.files[file_id];
+                let path = index.root.join(&file.path);
+                let map = ReadOnlyMap::open(&path)?;
+                let bytes = map.bytes();
+                let positions = find_positions(bytes, &needle, ignore_case, file_limit);
+
+                let mut tracker = LineTracker::new();
+                let mut hits = Vec::with_capacity(positions.len());
+                for position in positions {
+                    let (line, line_start) = tracker.locate(bytes, position);
+                    let line_end = memchr_iter(b'\n', &bytes[position..])
+                        .next()
+                        .map(|offset| position + offset)
+                        .unwrap_or(bytes.len());
+                    let snippet = snippet(bytes, line_start, line_end, snippet_chars);
+                    let enclosing = index.enclosing_function(file_id as u32, position as u64);
+                    hits.push(SearchHit {
+                        file: file.path.clone(),
+                        line,
+                        column: (position.saturating_sub(line_start) + 1) as u64,
+                        text: snippet,
+                        function: enclosing.map(|function| function.name.clone()),
+                        address: enclosing.and_then(|function| function.address.clone()),
+                        score: 0,
+                    });
+                }
+
+                Ok(FileSearch {
+                    hits,
+                    scanned_bytes: bytes.len() as u64,
+                })
+            })
+            .collect();
+
+        for result in file_results {
+            let result = result?;
+            scanned_bytes = scanned_bytes.saturating_add(result.scanned_bytes);
+            all_hits.extend(result.hits);
+        }
+
+        if all_hits.len() > limit {
+            all_hits.truncate(limit);
+            truncated = true;
+            break;
+        }
     }
 
     all_hits.sort_by(|left, right| {
@@ -365,11 +400,6 @@ fn search_text(
             .then(left.line.cmp(&right.line))
             .then(left.column.cmp(&right.column))
     });
-    if all_hits.len() > limit {
-        all_hits.truncate(limit);
-        truncated = true;
-    }
-
     Ok(SearchReport {
         query: String::new(),
         mode: SearchMode::Text,
@@ -380,12 +410,7 @@ fn search_text(
     })
 }
 
-fn find_positions(
-    haystack: &[u8],
-    needle: &[u8],
-    ignore_case: bool,
-    limit: usize,
-) -> Vec<usize> {
+fn find_positions(haystack: &[u8], needle: &[u8], ignore_case: bool, limit: usize) -> Vec<usize> {
     if needle.is_empty() || haystack.len() < needle.len() {
         return Vec::new();
     }

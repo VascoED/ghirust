@@ -72,6 +72,9 @@ pub fn run(
                 report.cache_hits, report.cache_misses
             );
         }
+        for warning in &report.cache_warnings {
+            eprintln!("Warning: {warning}");
+        }
     }
     Ok(())
 }

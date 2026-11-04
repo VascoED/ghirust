@@ -54,7 +54,10 @@ pub fn run(args: &StringsArgs, json: bool) -> Result<()> {
     }
 
     if records.is_empty() {
-        println!("No strings of at least {} character(s) found.", args.min_length);
+        println!(
+            "No strings of at least {} character(s) found.",
+            args.min_length
+        );
         return Ok(());
     }
 

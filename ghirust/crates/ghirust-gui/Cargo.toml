@@ -1,0 +1,21 @@
+[package]
+name = "ghirust-gui"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Native desktop interface for GHIRUST"
+
+[[bin]]
+name = "ghirust-gui"
+path = "src/main.rs"
+
+[dependencies]
+eframe.workspace = true
+ghirust-core = { path = "../ghirust-core" }
+rfd.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

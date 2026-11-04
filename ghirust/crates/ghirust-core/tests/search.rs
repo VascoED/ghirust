@@ -64,6 +64,23 @@ fn finds_text_and_attributes_the_enclosing_function() {
 }
 
 #[test]
+fn exact_result_limit_is_not_reported_as_truncated() {
+    let (_temp, index) = fixture();
+    let report = search(
+        &index,
+        &SearchOptions {
+            query: "MAGIC_TOKEN".to_owned(),
+            limit: 1,
+            ..SearchOptions::default()
+        },
+    )
+    .unwrap();
+
+    assert_eq!(report.hits.len(), 1);
+    assert!(!report.truncated);
+}
+
+#[test]
 fn case_insensitive_text_search_spans_files() {
     let (_temp, index) = fixture();
     let report = search(
@@ -188,6 +205,70 @@ fn rebuild_reuses_the_content_addressed_scan_cache() {
 }
 
 #[test]
+fn rebuild_reports_cache_failures_and_continues_indexing() {
+    let temp = tempdir().unwrap();
+    fs::write(
+        temp.path().join("sample.c"),
+        "// Function: main @ 0x1000\nint main(void) { return 0; }\n",
+    )
+    .unwrap();
+    let cache_path = temp.path().join(".ghirust").join("cache");
+    fs::create_dir_all(cache_path.parent().unwrap()).unwrap();
+    fs::write(&cache_path, "cache path is not a directory").unwrap();
+
+    let report = build_index(&IndexOptions {
+        root: temp.path().to_path_buf(),
+        index_path: temp.path().join(".ghirust").join("index.json"),
+        include_hidden: false,
+    })
+    .unwrap();
+
+    assert_eq!(report.functions, 1);
+    assert_eq!(report.cache_misses, 1);
+    assert_eq!(report.cache_warnings.len(), 1);
+    assert!(report.cache_warnings[0].contains("scan cache unavailable"));
+}
+
+#[test]
+fn rebuild_reports_corrupt_cache_manifest_and_recovers() {
+    let temp = tempdir().unwrap();
+    fs::write(
+        temp.path().join("sample.c"),
+        "// Function: main @ 0x1000\nint main(void) { return 0; }\n",
+    )
+    .unwrap();
+    let options = IndexOptions {
+        root: temp.path().to_path_buf(),
+        index_path: temp.path().join(".ghirust").join("index.json"),
+        include_hidden: false,
+    };
+
+    build_index(&options).unwrap();
+    fs::write(
+        temp.path()
+            .join(".ghirust")
+            .join("cache")
+            .join("index.json"),
+        "{ invalid json",
+    )
+    .unwrap();
+
+    let recovered = build_index(&options).unwrap();
+    assert_eq!(recovered.functions, 1);
+    assert_eq!(recovered.cache_misses, 1);
+    assert!(
+        recovered
+            .cache_warnings
+            .iter()
+            .any(|warning| warning.contains("invalid cache manifest"))
+    );
+
+    let reused = build_index(&options).unwrap();
+    assert_eq!(reused.cache_hits, 1);
+    assert_eq!(reused.cache_misses, 0);
+}
+
+#[test]
 fn limits_results_and_reports_truncation() {
     let (_temp, index) = fixture();
     let report = search(
@@ -201,5 +282,23 @@ fn limits_results_and_reports_truncation() {
     )
     .unwrap();
     assert!(report.hits.len() <= 2);
+    assert!(report.truncated);
+}
+
+#[test]
+fn text_results_remain_path_ordered_when_truncated() {
+    let (_temp, index) = fixture();
+    let report = search(
+        &index,
+        &SearchOptions {
+            query: "return".to_owned(),
+            limit: 1,
+            ..SearchOptions::default()
+        },
+    )
+    .unwrap();
+
+    assert_eq!(report.hits.len(), 1);
+    assert_eq!(report.hits[0].file, "src/alpha.c");
     assert!(report.truncated);
 }

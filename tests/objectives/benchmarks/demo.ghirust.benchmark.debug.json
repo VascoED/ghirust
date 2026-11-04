@@ -1,0 +1,83 @@
+﻿{
+  "core_analysis_ms": {
+    "max": 8,
+    "mean": 5.0,
+    "median": 4,
+    "min": 4
+  },
+  "decompile": true,
+  "file": "./tests\\objectives\\binaries\\demo.dll",
+  "file_bytes": 9728,
+  "runs": 5,
+  "samples": [
+    {
+      "analysis_ms": 8,
+      "blocks": 105,
+      "functions": 19,
+      "instructions": 442,
+      "wall_ms": 10,
+      "xrefs": 291
+    },
+    {
+      "analysis_ms": 4,
+      "blocks": 105,
+      "functions": 19,
+      "instructions": 442,
+      "wall_ms": 5,
+      "xrefs": 291
+    },
+    {
+      "analysis_ms": 4,
+      "blocks": 105,
+      "functions": 19,
+      "instructions": 442,
+      "wall_ms": 5,
+      "xrefs": 291
+    },
+    {
+      "analysis_ms": 4,
+      "blocks": 105,
+      "functions": 19,
+      "instructions": 442,
+      "wall_ms": 5,
+      "xrefs": 291
+    },
+    {
+      "analysis_ms": 5,
+      "blocks": 105,
+      "functions": 19,
+      "instructions": 442,
+      "wall_ms": 6,
+      "xrefs": 291
+    }
+  ],
+  "sha256": "8e333cc5e9f91a82c675beaf108e8cfccb33e9d5e2c34e8c8fb30705cedd8773",
+  "stats": {
+    "blocks": 105,
+    "elapsed_ms": 5,
+    "functions": 19,
+    "instructions": 442,
+    "linear_scan_instructions": 1328,
+    "overlapping_functions_skipped": 23,
+    "seeds": 42,
+    "truncated": false,
+    "xrefs": 291
+  },
+  "wall_ms": {
+    "max": 10,
+    "mean": 6.2,
+    "median": 5,
+    "min": 5
+  },
+  "warnings": [
+    "linear sweep decoded 1328 instruction(s) across 1 executable section(s)",
+    "demo_sum_loop: instruction 'movq' at 0x1800010a0 has no semantic model",
+    "demo_sum_loop: instruction 'paddq' at 0x1800010af has no semantic model",
+    "demo_sum_loop: instruction 'pshufd' at 0x1800010c8 has no semantic model",
+    "demo_sum_loop: instruction 'punpckldq' at 0x1800010ab has no semantic model",
+    "FUN_1800010f0: instruction 'int3' at 0x180001254 has no semantic model",
+    "FUN_1800014e0: instruction 'cmpxchg' at 0x1800014fc has no semantic model",
+    "FUN_180001570: instruction 'movdqa' at 0x1800015ad has no semantic model",
+    "FUN_180001570: instruction 'movdqu' at 0x1800015b5 has no semantic model"
+  ]
+}

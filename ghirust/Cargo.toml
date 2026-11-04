@@ -3,6 +3,7 @@ resolver = "3"
 members = [
     "crates/ghirust-core",
     "crates/ghirust-cli",
+    "crates/ghirust-gui",
 ]
 
 [workspace.package]
@@ -14,15 +15,21 @@ repository = "https://github.com/VascoED/ghirust"
 description = "GHIRUST — fast, understandable, bounded-memory reverse engineering tooling"
 
 [workspace.dependencies]
+eframe = "0.31.1"
+rfd = "0.15.4"
+
 anyhow = "1.0"
 clap = { version = "4.5", features = ["derive", "wrap_help"] }
 flate2 = "1.0"
+iced-x86 = { version = "1.21", default-features = false, features = ["std", "decoder", "intel", "instr_info", "op_code_info"] }
 memchr = "2.7"
 memmap2 = "0.9"
+object = { version = "0.37", features = ["read", "pe", "elf", "macho", "wasm", "archive"] }
 rayon = "1.10"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sha2 = "0.10"
+sysinfo = "0.40"
 thiserror = "2.0"
 walkdir = "2.5"
 tempfile = "3.20"

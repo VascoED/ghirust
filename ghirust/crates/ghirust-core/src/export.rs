@@ -26,6 +26,7 @@ use std::time::Instant;
 use flate2::Compression as GzipLevel;
 use flate2::write::GzEncoder;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 use crate::error::{GhirustError, IoResultExt, Result};
 use crate::model::{ExportedFunction, FunctionRecord, ManifestRecord};
@@ -115,6 +116,7 @@ pub struct ExportReport {
 struct Checkpoint {
     records: u64,
     output_bytes: u64,
+    input_fingerprint: String,
 }
 
 struct CountingWriter<W> {
@@ -212,11 +214,12 @@ struct ExportWriter {
     last_checkpoint: u64,
     checkpoint_bytes: u64,
     resumed_from: u64,
+    input_fingerprint: String,
     started: Instant,
 }
 
 impl ExportWriter {
-    fn create(options: &ExportOptions) -> Result<Self> {
+    fn create(options: &ExportOptions, input_fingerprint: &str) -> Result<Self> {
         if options.output.as_os_str().is_empty() {
             return Err(GhirustError::message("an output path is required"));
         }
@@ -255,6 +258,12 @@ impl ExportWriter {
 
         let file = if options.resume && part.exists() && checkpoint_path.exists() {
             let checkpoint = read_checkpoint(&checkpoint_path)?;
+            if checkpoint.input_fingerprint != input_fingerprint {
+                return Err(GhirustError::message(format!(
+                    "refusing to resume export because the input or export options changed: {}",
+                    options.output.display()
+                )));
+            }
             let mut file = OpenOptions::new()
                 .read(true)
                 .write(true)
@@ -283,14 +292,13 @@ impl ExportWriter {
             let _ = fs::remove_file(&part);
             let _ = fs::remove_file(&checkpoint_path);
             let _ = fs::remove_file(&manifest_path);
-            let file = OpenOptions::new()
+            OpenOptions::new()
                 .create(true)
                 .read(true)
                 .write(true)
                 .truncate(true)
                 .open(&part)
-                .at(&part)?;
-            file
+                .at(&part)?
         };
 
         let counting = CountingWriter::new(file, uncompressed);
@@ -325,6 +333,7 @@ impl ExportWriter {
             last_checkpoint: uncompressed,
             checkpoint_bytes: options.checkpoint_bytes.max(64 * 1024),
             resumed_from,
+            input_fingerprint: input_fingerprint.to_owned(),
             started: Instant::now(),
         };
 
@@ -439,6 +448,7 @@ impl ExportWriter {
         let checkpoint = Checkpoint {
             records: self.records,
             output_bytes: self.sink.compressed_bytes(),
+            input_fingerprint: self.input_fingerprint.clone(),
         };
         write_checkpoint(&self.checkpoint_path, &checkpoint)?;
         self.last_checkpoint = self.uncompressed;
@@ -492,11 +502,7 @@ enum Body<'a> {
     Reader(&'a mut dyn Read),
 }
 
-fn copy_stream(
-    reader: &mut dyn Read,
-    sink: &mut Sink,
-    path: &Path,
-) -> Result<(u64, Option<u8>)> {
+fn copy_stream(reader: &mut dyn Read, sink: &mut Sink, path: &Path) -> Result<(u64, Option<u8>)> {
     let mut buffer = vec![0u8; 256 * 1024];
     let mut last = None;
     let mut copied = 0u64;
@@ -537,8 +543,8 @@ fn read_checkpoint(path: &Path) -> Result<Checkpoint> {
 
 fn write_checkpoint(path: &Path, checkpoint: &Checkpoint) -> Result<()> {
     let temp = sibling(path, ".tmp");
-    let bytes = serde_json::to_vec(checkpoint)
-        .map_err(|source| GhirustError::json(path, source))?;
+    let bytes =
+        serde_json::to_vec(checkpoint).map_err(|source| GhirustError::json(path, source))?;
     fs::write(&temp, bytes).at(&temp)?;
     if path.exists() {
         fs::remove_file(path).at(path)?;
@@ -571,6 +577,13 @@ fn truncate_manifest(path: &Path, records: u64) -> Result<()> {
         writer.write_all(&line).at(&temp)?;
         count += 1;
     }
+    if count < records {
+        fs::remove_file(&temp).at(&temp)?;
+        return Err(GhirustError::message(format!(
+            "cannot resume export: manifest {} contains {count} record(s), but the checkpoint requires {records}",
+            path.display()
+        )));
+    }
     writer.flush().at(&temp)?;
     writer.get_ref().sync_all().at(&temp)?;
 
@@ -586,7 +599,10 @@ fn safe_join(root: &Path, relative: &str) -> Result<PathBuf> {
         )));
     }
     for component in candidate.components() {
-        if matches!(component, Component::ParentDir | Component::RootDir | Component::Prefix(_)) {
+        if matches!(
+            component,
+            Component::ParentDir | Component::RootDir | Component::Prefix(_)
+        ) {
             return Err(GhirustError::message(format!(
                 "manifest entry escapes the export directory: {relative}"
             )));
@@ -597,9 +613,10 @@ fn safe_join(root: &Path, relative: &str) -> Result<PathBuf> {
 
 /// Export a newline-delimited JSON file, one [`FunctionRecord`] per line.
 pub fn export_ndjson(input: &Path, options: &ExportOptions) -> Result<ExportReport> {
+    let fingerprint = export_input_fingerprint(input, options)?;
     let file = File::open(input).at(input)?;
     let mut reader = BufReader::with_capacity(256 * 1024, file);
-    let mut writer = ExportWriter::create(options)?;
+    let mut writer = ExportWriter::create(options, &fingerprint)?;
     let skip = writer.resumed_from();
 
     let mut parsed = 0u64;
@@ -623,6 +640,12 @@ pub fn export_ndjson(input: &Path, options: &ExportOptions) -> Result<ExportRepo
         parsed += 1;
     }
 
+    if parsed < skip {
+        return Err(GhirustError::message(format!(
+            "cannot resume export: checkpoint contains {skip} record(s), but the input has only {parsed}"
+        )));
+    }
+
     if writer.records == 0 {
         writer.discard();
         return Err(GhirustError::EmptyInput);
@@ -636,30 +659,46 @@ pub fn export_ndjson(input: &Path, options: &ExportOptions) -> Result<ExportRepo
 /// Otherwise every `.c`, `.cc`, `.cpp` or `.cxx` file is exported in name
 /// order, using the file stem as the function name.
 pub fn export_directory(input: &Path, options: &ExportOptions) -> Result<ExportReport> {
+    let fingerprint = export_input_fingerprint(input, options)?;
     let manifest_path = input.join("manifest.ndjson");
-    let entries = if manifest_path.exists() {
-        read_directory_manifest(&manifest_path)?
-    } else {
-        discover_function_files(input)?
-    };
-
-    if entries.is_empty() {
-        return Err(GhirustError::EmptyInput);
-    }
-
-    let mut writer = ExportWriter::create(options)?;
+    let mut writer = ExportWriter::create(options, &fingerprint)?;
     let skip = writer.resumed_from();
     let mut processed = 0u64;
 
-    for entry in entries {
-        if processed < skip {
+    if manifest_path.exists() {
+        visit_directory_manifest(&manifest_path, |entry| {
+            if processed >= skip {
+                let path = safe_join(input, &entry.file)?;
+                let mut file = File::open(&path).at(&path)?;
+                writer.write_function_from_reader(
+                    &entry.name,
+                    entry.address.as_deref(),
+                    &mut file,
+                )?;
+            }
             processed += 1;
-            continue;
+            Ok(())
+        })?;
+    } else {
+        let entries = discover_function_files(input)?;
+        for entry in entries {
+            if processed >= skip {
+                let path = safe_join(input, &entry.file)?;
+                let mut file = File::open(&path).at(&path)?;
+                writer.write_function_from_reader(
+                    &entry.name,
+                    entry.address.as_deref(),
+                    &mut file,
+                )?;
+            }
+            processed += 1;
         }
-        let path = safe_join(input, &entry.file)?;
-        let mut file = File::open(&path).at(&path)?;
-        writer.write_function_from_reader(&entry.name, entry.address.as_deref(), &mut file)?;
-        processed += 1;
+    }
+
+    if processed < skip {
+        return Err(GhirustError::message(format!(
+            "cannot resume export: checkpoint contains {skip} record(s), but the input has only {processed}"
+        )));
     }
 
     if writer.records == 0 {
@@ -674,13 +713,14 @@ pub fn export_directory(input: &Path, options: &ExportOptions) -> Result<ExportR
 /// This is a convenience path for users who already have a `.c` file and want
 /// to normalise it or compress it. The function name is the file stem.
 pub fn export_single_file(input: &Path, options: &ExportOptions) -> Result<ExportReport> {
+    let fingerprint = export_input_fingerprint(input, options)?;
     let name = input
         .file_stem()
         .and_then(|value| value.to_str())
         .unwrap_or("source")
         .to_owned();
     let mut file = File::open(input).at(input)?;
-    let mut writer = ExportWriter::create(options)?;
+    let mut writer = ExportWriter::create(options, &fingerprint)?;
     if writer.resumed_from() > 0 {
         writer.discard();
         return Err(GhirustError::message(
@@ -715,10 +755,94 @@ pub fn export_input(input: &Path, options: &ExportOptions) -> Result<ExportRepor
     }
 }
 
-fn read_directory_manifest(path: &Path) -> Result<Vec<ManifestRecord>> {
+/// Compute the identity used to validate an interrupted export before resuming.
+///
+/// The fingerprint covers source content and output-affecting options. Directory
+/// inputs are walked through their manifest without retaining it in memory.
+pub fn export_input_fingerprint(input: &Path, options: &ExportOptions) -> Result<String> {
+    let metadata = fs::metadata(input).at(input)?;
+    let mut hasher = Sha256::new();
+    hasher.update(b"GHIRUST export fingerprint v1\0");
+    hasher.update(HEADER.as_bytes());
+    hasher.update([match options.compression {
+        Compression::None => 0,
+        Compression::Gzip => 1,
+    }]);
+    hasher.update([u8::from(options.write_manifest)]);
+
+    if metadata.is_dir() {
+        let manifest_path = input.join("manifest.ndjson");
+        if manifest_path.exists() {
+            visit_directory_manifest(&manifest_path, |entry| {
+                fingerprint_manifest_entry(input, entry, &mut hasher)
+            })?;
+        } else {
+            for entry in discover_function_files(input)? {
+                fingerprint_manifest_entry(input, entry, &mut hasher)?;
+            }
+        }
+    } else {
+        let extension = input
+            .extension()
+            .and_then(|value| value.to_str())
+            .unwrap_or("")
+            .to_ascii_lowercase();
+        fingerprint_field(&mut hasher, extension.as_bytes());
+        fingerprint_file(input, &mut hasher)?;
+    }
+
+    let digest = hasher.finalize();
+    let mut fingerprint = String::with_capacity(digest.len() * 2);
+    for byte in digest {
+        use std::fmt::Write as _;
+        write!(&mut fingerprint, "{byte:02x}").expect("writing to a String cannot fail");
+    }
+    Ok(fingerprint)
+}
+
+fn fingerprint_manifest_entry(
+    root: &Path,
+    entry: ManifestRecord,
+    hasher: &mut Sha256,
+) -> Result<()> {
+    fingerprint_field(hasher, entry.name.as_bytes());
+    fingerprint_field(
+        hasher,
+        entry.address.as_deref().unwrap_or_default().as_bytes(),
+    );
+    fingerprint_field(hasher, entry.file.as_bytes());
+    let path = safe_join(root, &entry.file)?;
+    fingerprint_file(&path, hasher)
+}
+
+fn fingerprint_field(hasher: &mut Sha256, value: &[u8]) {
+    hasher.update((value.len() as u64).to_le_bytes());
+    hasher.update(value);
+}
+
+fn fingerprint_file(path: &Path, hasher: &mut Sha256) -> Result<()> {
+    let mut file = File::open(path).at(path)?;
+    let size = file.metadata().at(path)?.len();
+    let mut content_hasher = Sha256::new();
+    let mut buffer = vec![0u8; 256 * 1024];
+    loop {
+        let read = file.read(&mut buffer).at(path)?;
+        if read == 0 {
+            break;
+        }
+        content_hasher.update(&buffer[..read]);
+    }
+    fingerprint_field(hasher, &size.to_le_bytes());
+    fingerprint_field(hasher, &content_hasher.finalize());
+    Ok(())
+}
+
+fn visit_directory_manifest(
+    path: &Path,
+    mut visit: impl FnMut(ManifestRecord) -> Result<()>,
+) -> Result<()> {
     let file = File::open(path).at(path)?;
     let reader = BufReader::new(file);
-    let mut entries = Vec::new();
     for line in reader.lines() {
         let line = line.at(path)?;
         if line.trim().is_empty() {
@@ -726,9 +850,9 @@ fn read_directory_manifest(path: &Path) -> Result<Vec<ManifestRecord>> {
         }
         let entry: ManifestRecord =
             serde_json::from_str(&line).map_err(|source| GhirustError::json(path, source))?;
-        entries.push(entry);
+        visit(entry)?;
     }
-    Ok(entries)
+    Ok(())
 }
 
 fn discover_function_files(input: &Path) -> Result<Vec<ManifestRecord>> {

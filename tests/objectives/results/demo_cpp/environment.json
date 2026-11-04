@@ -1,0 +1,24 @@
+{
+  "captured_at": "2026-11-04T18:05:12+0000",
+  "python": "3.12.9",
+  "os": {
+    "system": "Windows",
+    "release": "11",
+    "version": "10.0.26200",
+    "machine": "AMD64"
+  },
+  "processor_identifier": "Intel64 Family 6 Model 186 Stepping 2, GenuineIntel",
+  "logical_processors": "16",
+  "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+  "cargo": "cargo 1.98.1 (797e8a9bc 2026-08-05)",
+  "ghidra_home": "$GHIDRA_HOME",
+  "ghidra_version": "12.2",
+  "java_home": "$JAVA_HOME",
+  "java_version": "java version \"25.0.4.1\" 2026-08-18 LTS",
+  "ghirust_binary": "./ghirust\\target\\release\\ghirust.exe",
+  "ghirust_version": "ghirust 0.1.0",
+  "runs": 3,
+  "binary": "./tests\\objectives\\binaries\\demo_cpp.dll",
+  "binary_sha256": "ea8badac1ce99feca022c85c2434d0305e2d36572827a0541838c1a6f9ac8afe",
+  "binary_bytes": 119808
+}
